@@ -17,10 +17,13 @@ hex_version=$(printf "%08X" $version_number)
 
 # Print the new version number, HEX version, date
 echo "New version number: $version_number"
-echo "::set-output name=version::$version_number"
 echo "HEX: 0x$hex_version"
 echo "build date: $current_date"
-echo "::set-output name=date::$current_date"
+
+# Set the output date variable
+echo "version=$version_number" >> $GITHUB_ENV
+# Set the output date variable
+echo "date=$current_date" >> $GITHUB_ENV
 
 # Update the device version in ZigUSB.h using awk
 awk -v hex_version="$hex_version" '/OTA_FW_VERSION/ {sub(/0x[0-9A-F]*/, "0x" hex_version)} 1' main/ZigUSB.h > temp && mv temp main/ZigUSB.h
