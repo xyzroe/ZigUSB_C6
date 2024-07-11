@@ -27,16 +27,11 @@ jobs:
         ./install.sh
         . ./export.sh
 
-    - name: Install IDF Component Manager
+    - name: Install IDF Component Manager and dependencies
       run: |
-        source $ESP_IDF/export.sh
+        . $HOME/esp/esp-idf/export.sh
         python -m pip install idf-component-manager
-
-    - name: Install dependencies and Build
-      run: |
-        source $ESP_IDF/export.sh
         idf.py reconfigure
-        idf.py build
 
     - name: Build
       run: |
@@ -46,7 +41,7 @@ jobs:
     - name: Archive build output artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: output
+        name: build
         path: |
           output/ZigUSB_C6.ota
           output/ZigUSB_C6.bin
