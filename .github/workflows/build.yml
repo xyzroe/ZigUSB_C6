@@ -8,19 +8,28 @@ on:
     branches:
       - main
 
+ # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  # This workflow contains a single job called "build"
   build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Install ESP-IDF and Build project
+        uses: rmshub/esp-idf-action@v5
+        with: 
+            esp_idf_version: v5.2.2
+            esp_idf_target: esp32c6
 
-      - name: Run Docker container
-        uses: addnab/docker-run-action@v3
+      - name: Archive build output artifacts
+        uses: actions/upload-artifact@v3
         with:
-          image: espressif/idf:latest
-          options: -v ${{ github.workspace }}:/workspace
-          run: |
-            cd /workspace
-            idf.py build
+          name: output
+          path: |
+            output/ZigUSB_C6.ota
+            output/ZigUSB_C6.bin
