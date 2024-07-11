@@ -34,22 +34,26 @@ jobs:
         idf.py reconfigure
 
     - name: Build
+      id: build
       run: |
         . ./esp-idf/export.sh
         idf.py build
 
-    - name: Get version
-      id: get_version
+    - name: Create Tag and Commit
       run: |
-        FILE_VERSION=$(grep -o '#define\s\+OTA_FW_VERSION\s\+0x[0-9a-fA-F]\+' ./main/ZigUSB.h | awk '{print $3}')
-        echo "File version: $FILE_VERSION"
-        echo "::set-output name=version::$FILE_VERSION"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag -a ${{ steps.build.outputs.version }} -m "Version ${{ steps.build.outputs.version }}"
+        git push --tags
 
+    - name: Checkout
+      uses: actions/checkout@v2
+      
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         generate_release_notes: true
-        name: "${{ steps.get_version.outputs.version }}"
+        name: "${{ steps.build.outputs.version }}"
         files: |
           output/ZigUSB_C6.ota
           output/ZigUSB_C6.bin
