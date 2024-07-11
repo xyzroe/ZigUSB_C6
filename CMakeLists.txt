@@ -13,10 +13,13 @@ add_custom_command(TARGET ${CMAKE_PROJECT_NAME}.elf PRE_BUILD
     COMMENT "Update version script finish!"
 )
 
-# Add a custom command that will be executed after building the main target
-add_custom_command(TARGET ${CMAKE_PROJECT_NAME}.elf POST_BUILD
+# Define a custom target for the OTA script
+add_custom_target(make_ota ALL
     COMMAND ${CMAKE_COMMAND} -E echo "Executing make OTA script..."
     COMMAND bash ${CMAKE_SOURCE_DIR}/tools/make_ota.sh
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Make OTA script finish!"
 )
+
+# Add a dependency of this target on the main project build target
+add_dependencies(make_ota ${CMAKE_PROJECT_NAME}.elf)
