@@ -38,10 +38,19 @@ jobs:
         . ./esp-idf/export.sh
         idf.py build
 
-    - name: Archive build output artifacts
-      uses: actions/upload-artifact@v3
+    - name: Get version
+      id: get_version
+      run: |
+        FILE_VERSION=$(grep -o '#define\s\+OTA_FW_VERSION\s\+0x[0-9a-fA-F]\+' ./main/ZigUSB.h | awk '{print $3}')
+        echo "File version: $FILE_VERSION"
+        echo "::set-output name=version::$FILE_VERSION"
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        name: build
-        path: |
+        generate_release_notes: true
+        name: "${{ steps.get_version.outputs.version }}"
+        files: |
           output/ZigUSB_C6.ota
           output/ZigUSB_C6.bin
+          
