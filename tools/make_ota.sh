@@ -18,7 +18,7 @@ fi
 # Print the values
 echo "M: $MANUFACTURER | IT: $IMAGE_TYPE | FV: $FILE_VERSION";
 
-# Create the output folder if it doesn't exist
+# Create the output folder if it doesn't exist yet
 mkdir -p ../output
 
 # Create the OTA file
