@@ -29,8 +29,7 @@ jobs:
 
     - name: Install IDF Component Manager and dependencies
       run: |
-        cd esp-idf
-        . ./export.sh
+        . ./esp-idf/export.sh
         python -m pip install idf-component-manager
         idf.py reconfigure
 
