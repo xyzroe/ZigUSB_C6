@@ -36,8 +36,7 @@ jobs:
 
     - name: Build
       run: |
-        cd esp-idf
-        . ./export.sh
+        . ./esp-idf/export.sh
         idf.py build
 
     - name: Archive build output artifacts
