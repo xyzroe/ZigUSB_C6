@@ -8,8 +8,6 @@ on:
   push:
     tags:
       - "*"
-    branches:
-      - main
 
 jobs:
   build:
@@ -41,15 +39,6 @@ jobs:
       run: |
         . ./esp-idf/export.sh
         idf.py build
-
-    - name: Create Tag and Commit
-      run: |
-        if [ -z "$(git tag -l ${{ env.version }})" ]; then
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git tag -a ${{ env.version }} -m "Version ${{ env.version }}"
-          git push --tags
-        fi
 
     - name: Checkout
       uses: actions/checkout@v2
