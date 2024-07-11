@@ -12,27 +12,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout
+      uses: actions/checkout@v2
+      
     - name: Setup Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.7'
+
     - name: Install ESP-IDF
       run: |
         git clone --recursive -b v5.2.2 https://github.com/espressif/esp-idf.git
         cd esp-idf
         ./install.sh
         . ./export.sh
+
     - name: Install IDF Component Manager
       run: |
+        source $ESP_IDF/export.sh
         python -m pip install idf-component-manager
-    - name: Install dependencies
+
+    - name: Install dependencies and Build
       run: |
+        source $ESP_IDF/export.sh
         idf.py reconfigure
+        idf.py build
+
     - name: Build
       run: |
         . $HOME/esp/esp-idf/export.sh
         idf.py build
+
     - name: Archive build output artifacts
       uses: actions/upload-artifact@v3
       with:
