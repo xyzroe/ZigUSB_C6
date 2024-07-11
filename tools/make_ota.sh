@@ -18,8 +18,8 @@ fi
 # Print the values
 echo "M: $MANUFACTURER | IT: $IMAGE_TYPE | FV: $FILE_VERSION";
 
-# Create the output folder
-mkdir ../output
+# Create the output folder if it doesn't exist
+mkdir -p ../output
 
 # Create the OTA file
 python3 create-ota.py -m "$MANUFACTURER" -i "$IMAGE_TYPE" -v "$FILE_VERSION" ../build/ZigUSB.bin ../output/ZigUSB_C6.ota
