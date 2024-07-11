@@ -16,25 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
+      - name: Run Docker container
+        uses: addnab/docker-run-action@v3
         with:
-          python-version: '3.x'
-
-      - name: Install ESP-IDF dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-setuptools cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
-          sudo pip3 install --upgrade pip
-
-      - name: Install ESP-IDF
-        run: |
-          git clone --recursive https://github.com/espressif/esp-idf.git
-          cd esp-idf
-          ./install.sh
-          . ./export.sh
-          
-      - name: Build project
-        run: |
-          cd $GITHUB_WORKSPACE
-          idf.py build
+          image: espressif/idf:latest
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            cd /workspace
+            idf.py build
