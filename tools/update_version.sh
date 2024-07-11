@@ -1,5 +1,7 @@
 #!/bin/bash
 
+current_date=$(date +%Y%m%d)
+
 # Check if the script is being run in a GitHub workflow
 if [ "$GITHUB_ACTIONS" = true ]; then
   # Get the latest tag
@@ -9,7 +11,7 @@ if [ "$GITHUB_ACTIONS" = true ]; then
 
 else
   # Set the first release date
-  first_release_date="20240101"
+  first_release_date="20240701"
 
   # Get the current date
   current_date=$(date +%Y%m%d)
@@ -32,7 +34,7 @@ echo "build date: $current_date"
 # Set the output date variable
 echo "version=$version_number" >> $GITHUB_ENV
 # Set the output date variable
-echo "date=$current_date" >> $GITHUB_ENV
+echo "build_date=$current_date" >> $GITHUB_ENV
 
 # Update the device version in ZigUSB.h using awk
 awk -v hex_version="$hex_version" '/OTA_FW_VERSION/ {sub(/0x[0-9A-F]*/, "0x" hex_version)} 1' main/ZigUSB.h > temp && mv temp main/ZigUSB.h

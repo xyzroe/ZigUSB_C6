@@ -38,7 +38,7 @@ else
 fi
 
 # Set the first release date
-first_release_date="20240101"
+first_release_date="20240701"
 
 # Get the current date
 current_date=$(date +%Y%m%d)

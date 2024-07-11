@@ -39,15 +39,16 @@ jobs:
       run: |
         . ./esp-idf/export.sh
         idf.py build
-
-    - name: Checkout
-      uses: actions/checkout@v2
       
+    - name: Make OTA and move BIN files
+      run: |
+        . ./tools/make_ota.sh
+
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         generate_release_notes: true
-        name: "${{ env.version }} (${{ env.date }})"
+        name: "${{ env.version }} (${{ env.build_date }})"
         files: |
           output/ZigUSB_C6.ota
           output/ZigUSB_C6.bin
