@@ -4,23 +4,23 @@ current_date=$(date +%Y%m%d)
 
 # Check if the script is being run in a GitHub workflow
 if [ "$GITHUB_ACTIONS" = true ]; then
-  # Get the latest tag
-  latest_tag=$(git describe --tags --abbrev=0)
-  # Extract the version number from the latest tag
-  version_number=${latest_tag}
-
+    # Get the latest tag
+    latest_tag=$(git describe --tags --abbrev=0)
+    # Extract the version number from the latest tag
+    version_number=${latest_tag}
+    
 else
-  # Set the first release date
-  first_release_date="20240701"
-
-  # Get the current date
-  current_date=$(date +%Y%m%d)
-
-  # Calculate the version number
-  version_number=$((current_date - first_release_date))
-  if [ $version_number -lt 1 ]; then
-    version_number=1
-  fi
+    # Set the first release date
+    first_release_date="20240701"
+    
+    # Get the current date
+    current_date=$(date +%Y%m%d)
+    
+    # Calculate the version number
+    version_number=$((current_date - first_release_date))
+    if [ $version_number -lt 1 ]; then
+        version_number=1
+    fi
 fi
 
 # Convert the version number to hexadecimal

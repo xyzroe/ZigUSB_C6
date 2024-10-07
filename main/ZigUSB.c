@@ -1,4 +1,4 @@
-#include "ZigUSB.h"
+
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -8,29 +8,47 @@
 #include "freertos/task.h"
 #include "zcl/esp_zigbee_zcl_common.h"
 #include "ina219.h"
-#include "iot_button.h"
 #include <time.h>
 #include <sys/time.h>
-#include "driver/temperature_sensor.h"
+
 #include "ha/esp_zigbee_ha_standard.h"
+#include "esp_timer.h"
+#include "esp_ota_ops.h"
+
+#include "ZigUSB.h"
+#include "tools.h"
+#include "perf.h"
 
 /*------ Clobal definitions -----------*/
-static char manufacturer[16], model[16], firmware_version[16], firmware_date[16];
-bool time_updated = false, connected = false;
-
-uint16_t power = 0, voltage = 0, current = 0, CPU_temp = 0, uptime = 0;           // ZB values
-float ina_bus_voltage = 0, ina_shunt_voltage = 0, ina_current = 0, ina_power = 0; // INA219 values
-
-float led_hz = 0; // LED blinks every 1000/led_hz millis
+/*------ Global definitions -----------*/
+float led_hz = 0;
 char strftime_buf[64];
+DataStructure data;
+
+char manufacturer[16];
+char model[16];
+char firmware_version[16];
+char firmware_date[16];
+bool time_updated = false;
+bool connected = false;
+bool usb_pwr_state = false;
+
+uint16_t power = 0;
+uint16_t voltage = 0;
+uint16_t current = 0;
+uint16_t CPU_temp = 0;
+uint16_t uptime = 0;
+float ina_bus_voltage = 0;
+float ina_shunt_voltage = 0;
+float ina_current = 0;
+float ina_power = 0;
 
 static const char *TAG = HW_MODEL;
 
 static const char *ZIG_TAG = "ZB";
 
-static bool usb_pwr_state = false;
-
-DataStructure data;
+static const esp_partition_t *s_ota_partition = NULL;
+static esp_ota_handle_t s_ota_handle = 0;
 
 #if !defined CONFIG_ZB_ZCZR
 #error Define ZB_ZCZR in idf.py menuconfig to compile light (Router) source code.
@@ -58,91 +76,30 @@ static void esp_zb_buttons_handler(switch_func_pair_t *button_func_pair)
 }
 */
 
-void usb_driver_set_power(bool state)
-{
-    gpio_set_level(USB_GPIO, state);
-    ext_led_action(state);
-    ESP_LOGI("usb_driver_set_power", "Setting USB power to %d", state);
-    usb_pwr_state = state;
-    data.USB_state = state;
-    if (data.start_up_on_off > 1)
-    {
-        write_NVS("USB_state", state);
-    }
-}
-
 void send_bin_cfg_option(int endpoint, bool value)
 {
-    esp_zb_zcl_status_t state_tmp = esp_zb_zcl_set_attribute_val(endpoint,
-                                                                 ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
-                                                                 ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                                                 ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-                                                                 &value,
-                                                                 false);
-
-    if (state_tmp != ESP_ZB_ZCL_STATUS_SUCCESS)
+    if (connected)
     {
-        ESP_LOGE(TAG, "Setting cfg option On/Off attribute failed! error %d", state_tmp);
+        ESP_LOGW("send_bin_cfg_option", "attribute to %d", value);
+        esp_zb_zcl_status_t state_tmp = esp_zb_zcl_set_attribute_val(endpoint,
+                                                                     ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
+                                                                     ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                                                     ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+                                                                     &value,
+                                                                     false);
+
+        if (state_tmp != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(TAG, "Setting cfg option On/Off attribute failed! error %d", state_tmp);
+        }
+    }
+    else
+    {
+        ESP_LOGW("send_bin_cfg_option", "no connection! attribute to %d", value);
     }
 }
 
-static void button_single_click_cb(void *arg, void *usr_data)
-{
-    ESP_LOGI("Button boot", "Single click");
-
-    bool new_state = !(usb_pwr_state);
-    usb_driver_set_power(new_state);
-
-    /*  esp_zb_zcl_status_t state_tmp = esp_zb_zcl_set_attribute_val(1,
-                                                                   ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
-                                                                   ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                                                   ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-                                                                   &new_state,
-                                                                   false);
-
-      if (state_tmp != ESP_ZB_ZCL_STATUS_SUCCESS)
-      {
-          ESP_LOGE(TAG, "Setting On/Off attribute failed! error %d", state_tmp);
-      }*/
-    send_bin_cfg_option(1, new_state);
-}
-
-static void button_long_press_cb(void *arg, void *usr_data)
-{
-    ESP_LOGI("Button boot", "Long press, leave & reset");
-    data.ext_led_mode = 1; // Force turn LED ON
-    for (int i = 0; i < 5; i++)
-    {
-        ext_led_action(3);
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-    esp_zb_factory_reset();
-}
-
-void register_button()
-{
-    // create gpio button
-    button_config_t gpio_btn_cfg = {
-        .type = BUTTON_TYPE_GPIO,
-        .long_press_time = LONG_PRESS_TIME,
-        .short_press_time = SHORT_PRESS_TIME,
-        .gpio_button_config = {
-            .gpio_num = BTN_GPIO,
-            .active_level = 0,
-        },
-    };
-
-    button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
-    if (NULL == gpio_btn)
-    {
-        ESP_LOGE("Button boot", "Button create failed");
-    }
-
-    iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, button_single_click_cb, NULL);
-    iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_START, button_long_press_cb, NULL);
-}
-
-static void send_alarm_state(bool alarm)
+void send_alarm_state(bool alarm)
 {
 
     uint16_t new_zone_status = 0x0001;
@@ -186,351 +143,8 @@ static void send_alarm_state(bool alarm)
     }
 }
 
-static void alarm_input_active_cb(void *arg, void *usr_data)
-{
-    ESP_LOGE("Alarm input", "active");
-    data.alarm_state = 1;
-    send_alarm_state(data.alarm_state);
-}
-
-static void alarm_input_deactive_cb(void *arg, void *usr_data)
-{
-    ESP_LOGE("Alarm input", "deactive");
-    data.alarm_state = 0;
-    send_alarm_state(data.alarm_state);
-}
-
-void register_alarm_input()
-{
-    button_config_t gpio_alarm_cfg = {
-        .type = BUTTON_TYPE_GPIO,
-        .gpio_button_config = {
-            .gpio_num = ALARM_GPIO,
-            .active_level = 0,
-        },
-    };
-
-    button_handle_t gpio_alarm = iot_button_create(&gpio_alarm_cfg);
-    if (NULL == gpio_alarm)
-    {
-        ESP_LOGE("Alarm boot", "Alarm input create failed");
-    }
-
-    iot_button_register_cb(gpio_alarm, BUTTON_PRESS_UP, alarm_input_deactive_cb, NULL);
-    iot_button_register_cb(gpio_alarm, BUTTON_PRESS_DOWN, alarm_input_active_cb, NULL);
-}
-
-void setup_NVS()
-{
-    static const char *local_tag = "setup_NVS";
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        // NVS partition was truncated and needs to be erased
-        // Retry nvs_flash_init
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(err);
-    nvs_handle_t my_handle;
-    err = nvs_open("storage", NVS_READWRITE, &my_handle);
-    ESP_LOGI(local_tag, "Opening Non-Volatile Storage (NVS) handle... %s", (err != ESP_OK) ? "Failed!" : "Done");
-    if (err == ESP_OK)
-    {
-   
-        // Read
-        int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-        err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
-        ESP_LOGI(local_tag, "Reading restart counter from NVS ... %s", (err != ESP_OK) ? "Failed!" : "Done");
-        switch (err)
-        {
-        case ESP_OK:
-            ESP_LOGI(local_tag, "Restart counter = %" PRIu32, restart_counter);
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:
-            ESP_LOGI(local_tag, "The value is not initialized yet!");
-            break;
-        default:
-            ESP_LOGI(local_tag, "Error (%s) reading!", esp_err_to_name(err));
-        }
-
-        // Write
-        restart_counter++;
-        err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
-        ESP_LOGI(local_tag, "Updating restart counter in NVS ... %s", (err != ESP_OK) ? "Failed!" : "Done");
-
-        // Commit written value.
-        // After setting any values, nvs_commit() must be called to ensure changes are written
-        // to flash storage. Implementations may write to storage at other times,
-        // but this is not guaranteed.
-        err = nvs_commit(my_handle);
-        ESP_LOGI(local_tag, "Committing updates in NVS ... %s", (err != ESP_OK) ? "Failed!" : "Done");
-
-        // Close
-        nvs_close(my_handle);
-    }
-}
-
-bool int_to_bool(int32_t value)
-{
-    return (value != 0);
-}
-
-int read_NVS(const char *nvs_key)
-{
-    static const char *local_tag = "read_NVS";
-    nvs_handle_t my_handle;
-    esp_err_t err = nvs_open("storage", NVS_READWRITE, &my_handle);
-
-    // Read
-    // ESP_LOGI(TAG, "Reading restart counter from NVS ... ");
-    // int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-    int32_t value = 0;
-    err = nvs_get_i32(my_handle, nvs_key, &value);
-    switch (err)
-    {
-    case ESP_OK:
-        ESP_LOGI(local_tag, "%s is %ld ", nvs_key, value);
-        break;
-    case ESP_ERR_NVS_NOT_FOUND:
-        ESP_LOGE(local_tag, "The value is not initialized yet!");
-        int value = 0;
-
-        char *substring = "_led_mode";
-        if (strstr(nvs_key, substring) != NULL)
-        {
-            value = 1;
-        }
-        err = nvs_set_i32(my_handle, nvs_key, value);
-        ESP_LOGW(local_tag, "Updating %s in NVS ... %s", nvs_key, (err != ESP_OK) ? "Failed!" : "Done");
-        break;
-    default:
-        ESP_LOGE(local_tag, "Error (%s) reading!", esp_err_to_name(err));
-    }
-    // Close
-    nvs_close(my_handle);
-    if (err != ESP_OK)
-    {
-        return false;
-    }
-    return value;
-}
-
-bool write_NVS(const char *nvs_key, int value)
-{
-    static const char *local_tag = "write_NVS";
-    nvs_handle_t my_handle;
-    esp_err_t err = nvs_open("storage", NVS_READWRITE, &my_handle);
-    err = nvs_set_i32(my_handle, nvs_key, value);
-    ESP_LOGI(local_tag, "Write value... %s", (err != ESP_OK) ? "Failed!" : "Done");
-
-    // Commit written value.
-    // After setting any values, nvs_commit() must be called to ensure changes are written
-    // to flash storage. Implementations may write to storage at other times,
-    // but this is not guaranteed.
-    err = nvs_commit(my_handle);
-    ESP_LOGI(local_tag, "Commit updates... %s", (err != ESP_OK) ? "Failed!" : "Done");
-
-    // Close
-    nvs_close(my_handle);
-
-    if (err != ESP_OK)
-    {
-        return false;
-    }
-    return true;
-}
-
-void init_outputs()
-{
-    ESP_LOGI("init_outputs", "setup LEDs gpios");
-    gpio_reset_pin(EXT_LED_GPIO);
-    gpio_set_direction(EXT_LED_GPIO, GPIO_MODE_OUTPUT);
-    gpio_pulldown_en(EXT_LED_GPIO);
-    gpio_set_level(EXT_LED_GPIO, LED_OFF_STATE);
-
-    gpio_reset_pin(INT_LED_GPIO);
-    gpio_set_direction(INT_LED_GPIO, GPIO_MODE_OUTPUT);
-    gpio_pulldown_en(INT_LED_GPIO);
-    gpio_set_level(INT_LED_GPIO, LED_OFF_STATE);
-
-    ESP_LOGI("init_outputs", "setup USB gpio");
-    gpio_reset_pin(USB_GPIO);
-    gpio_set_direction(USB_GPIO, GPIO_MODE_OUTPUT);
-    gpio_pullup_en(USB_GPIO);
-    switch (data.start_up_on_off)
-    {
-    case 0:
-        usb_driver_set_power(0);
-        break;
-    case 1:
-        usb_driver_set_power(1);
-        break;
-    case 2:
-        usb_driver_set_power(!data.USB_state);
-        break;
-    case 255:
-        usb_driver_set_power(data.USB_state);
-        break;
-    default:
-        break;
-    }
-}
-
-void init_pullup_i2c_pins()
-{
-    ESP_LOGI("init_pullup_i2c_pins", "setup I2C_SDA_GPIO");
-    gpio_reset_pin(I2C_SDA_GPIO);
-    gpio_pullup_en(I2C_SDA_GPIO);
-    ESP_LOGI("init_pullup_i2c_pins", "setup I2C_SCL_GPIO");
-    gpio_reset_pin(I2C_SCL_GPIO);
-    gpio_pullup_en(I2C_SCL_GPIO);
-}
-
 /* --------- User task section -----------------*/
-static void get_rtc_time()
-{
-    time_t now;
-    struct tm timeinfo;
-    time(&now);
-    localtime_r(&now, &timeinfo);
-    strftime(strftime_buf, sizeof(strftime_buf), "%a %H:%M:%S", &timeinfo);
-}
 
-static void ina219_task(void *pvParameters)
-{
-    ina219_t dev;
-    memset(&dev, 0, sizeof(ina219_t));
-
-    assert(SHUNT_RESISTOR_MILLI_OHM > 0);
-    ESP_ERROR_CHECK(ina219_init_desc(&dev, I2C_ADDR, I2C_PORT, I2C_SDA_GPIO, I2C_SCL_GPIO));
-    ESP_LOGI(TAG, "Initializing INA219");
-    ESP_ERROR_CHECK(ina219_init(&dev));
-
-    ESP_LOGI(TAG, "Configuring INA219");
-    ESP_ERROR_CHECK(ina219_configure(&dev, INA219_BUS_RANGE_16V, INA219_GAIN_0_125,
-                                     INA219_RES_12BIT_1S, INA219_RES_12BIT_1S, INA219_MODE_CONT_SHUNT_BUS));
-
-    ESP_LOGI(TAG, "Calibrating INA219");
-
-    ESP_ERROR_CHECK(ina219_calibrate(&dev, (float)SHUNT_RESISTOR_MILLI_OHM / 1000.0f));
-
-    ESP_LOGI(TAG, "Starting the loop ina219_task");
-    while (1)
-    {
-        ESP_ERROR_CHECK(ina219_get_bus_voltage(&dev, &ina_bus_voltage));
-        ESP_ERROR_CHECK(ina219_get_shunt_voltage(&dev, &ina_shunt_voltage));
-        ESP_ERROR_CHECK(ina219_get_current(&dev, &ina_current));
-        ESP_ERROR_CHECK(ina219_get_power(&dev, &ina_power));
-        /* Using float in printf() requires non-default configuration in
-         * sdkconfig. See sdkconfig.defaults.esp32 and
-         * sdkconfig.defaults.esp8266  */
-        // printf("VBUS: %.04f V, VSHUNT: %.04f mV, IBUS: %.04f mA, PBUS: %.04f mW\n",
-        //      ina_bus_voltage, ina_shunt_voltage * 1000, ina_current * 1000, ina_power * 1000);
-
-        // ZCL must be V,A,W = uint16. But we need more accuaracy - so use *100.
-
-        voltage = (float)(ina_bus_voltage * 100);
-        current = (float)(ina_current * 100);
-        power = (float)(ina_power * 100);
-        vTaskDelay(pdMS_TO_TICKS(INA219_INTERVAL));
-    }
-}
-
-static void CPUtemp_task(void *pvParameters)
-{
-    ESP_LOGI(TAG, "Initializing temperature sensor");
-    temperature_sensor_handle_t temp_handle = NULL;
-    temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 60);
-    ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_handle));
-
-    ESP_LOGI(TAG, "Enable temperature sensor");
-    ESP_ERROR_CHECK(temperature_sensor_enable(temp_handle));
-
-    ESP_LOGI(TAG, "Starting the loop CPUtemp_task");
-    while (1)
-    {
-        // Enable temperature sensor
-        // ESP_ERROR_CHECK(temperature_sensor_enable(temp_handle));
-
-        // Get converted sensor data
-        float tsens_out;
-        ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_handle, &tsens_out));
-        // printf("Temperature in %f °C\n", tsens_out);
-        CPU_temp = (float)(tsens_out * 100);
-
-        // Disable the temperature sensor if it is not needed and save the power
-        // ESP_ERROR_CHECK(temperature_sensor_disable(temp_handle));
-        vTaskDelay(pdMS_TO_TICKS(CPU_TEMP_INTERVAL));
-
-#ifdef TEST_MODE
-        get_rtc_time();
-        ESP_LOGI(TAG, "time %s", strftime_buf);
-#endif
-    }
-}
-
-void int_led_blink()
-{
-    if (data.int_led_mode)
-    {
-        gpio_set_level(INT_LED_GPIO, LED_ON_STATE);
-        vTaskDelay(pdMS_TO_TICKS(150));
-        gpio_set_level(INT_LED_GPIO, LED_OFF_STATE);
-    }
-}
-
-void ext_led_action(int mode)
-{
-    // ESP_LOGW(TAG, "ext_led_action: mode %d, ex_led_m: %d", mode, data.ext_led_mode);
-    if (data.ext_led_mode)
-    {
-        if (mode == 1)
-        {
-            // ESP_LOGW(TAG, "ext_led_action: LED ON");
-            gpio_set_level(EXT_LED_GPIO, 0);
-        }
-        else if (mode == 0)
-        {
-            // ESP_LOGW(TAG, "ext_led_action: LED OFF");
-            gpio_set_level(EXT_LED_GPIO, 1);
-        }
-        else if (mode == 1)
-        {
-            // ESP_LOGW(TAG, "ext_led_action: LED invert");
-            int level = gpio_get_level(EXT_LED_GPIO);
-            gpio_set_level(EXT_LED_GPIO, !level);
-        }
-        else if (mode == 2)
-        {
-            // ESP_LOGW(TAG, "ext_led_action: LED blink");
-            int level = gpio_get_level(EXT_LED_GPIO);
-            gpio_set_level(EXT_LED_GPIO, !level);
-            vTaskDelay(pdMS_TO_TICKS(250));
-            gpio_set_level(EXT_LED_GPIO, level);
-        }
-    }
-}
-
-static void led_task(void *pvParameters)
-{
-    ESP_LOGI(TAG, "Starting LED");
-    // led_hz = 1;
-    while (1)
-    {
-        if (led_hz > 0)
-        {
-            int_led_blink();
-            vTaskDelay(pdMS_TO_TICKS(1000 / led_hz));
-        }
-        else
-        {
-            // LED disabled
-
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
-}
 /*----------------------------------------*/
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
@@ -539,7 +153,7 @@ static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
 }
 
 /* Manual reporting atribute to coordinator */
-static void reportAttribute(uint8_t endpoint, uint16_t clusterID, uint16_t attributeID, void *value, uint8_t value_length)
+/*static void reportAttribute(uint8_t endpoint, uint16_t clusterID, uint16_t attributeID, void *value, uint8_t value_length)
 {
     esp_zb_zcl_report_attr_cmd_t cmd = {
         .zcl_basic_cmd = {
@@ -555,6 +169,80 @@ static void reportAttribute(uint8_t endpoint, uint16_t clusterID, uint16_t attri
     esp_zb_zcl_attr_t *value_r = esp_zb_zcl_get_attribute(endpoint, clusterID, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, attributeID);
     memcpy(value_r->data_p, value, value_length);
     esp_zb_zcl_report_attr_cmd_req(&cmd);
+}*/
+
+void send_update_attribute_and_ias()
+{
+    if (connected)
+    {
+        static const char *local_tag = "z -> ias+attr";
+
+        int_led_blink();
+
+        // Send current alarm state value
+        send_alarm_state(data.alarm_state);
+
+        // Write new temperature value
+        esp_zb_zcl_status_t state_tmp = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &CPU_temp, false);
+        // Check for error
+        if (state_tmp != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting temperature attribute failed!");
+        }
+
+        // DC clusters
+        // Write new current value
+        esp_zb_zcl_status_t state_current = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &current, false);
+        // Check for error
+        if (state_current != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting current attribute failed!");
+        }
+
+        // Write new voltage value
+        esp_zb_zcl_status_t state_voltage = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &voltage, false);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        // Check for error
+        if (state_voltage != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting voltage attribute failed!");
+        }
+
+        // Write new power value
+        esp_zb_zcl_status_t state_power = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, &power, false);
+        // Check for error
+        if (state_power != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting power attribute failed!");
+        }
+
+        // AC clusters z2m
+        // Write new current value
+        state_current = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID, &current, false);
+        // Check for error
+        if (state_current != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting current attribute failed!");
+        }
+
+        // Write new voltage value
+        state_voltage = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID, &voltage, false);
+        // Check for error
+        if (state_voltage != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting voltage attribute failed!");
+        }
+
+        // Write new power value
+        state_power = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &power, false);
+        // Check for error
+        if (state_power != ESP_ZB_ZCL_STATUS_SUCCESS)
+        {
+            ESP_LOGE(local_tag, "Setting power attribute failed!");
+        }
+
+        ESP_LOGI(local_tag, "temperature = %d, current = %d, voltage = %d, power = %d", CPU_temp, current, voltage, power);
+    }
 }
 
 /* Task for update attribute value */
@@ -563,73 +251,8 @@ void update_attribute()
     static const char *local_tag = "update_attribute";
     while (1)
     {
-        if (connected)
-        {
-            /* Send current alarm state value */
-            send_alarm_state(data.alarm_state);
 
-            /* Write new temperature value */
-            esp_zb_zcl_status_t state_tmp = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &CPU_temp, false);
-            /* Check for error */
-            if (state_tmp != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting temperature attribute failed!");
-            }
-
-            // DC clusters
-            /* Write new current value */
-            esp_zb_zcl_status_t state_current = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &current, false);
-            /* Check for error */
-            if (state_current != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting current attribute failed!");
-            }
-
-            /* Write new voltage value */
-            esp_zb_zcl_status_t state_voltage = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &voltage, false);
-            vTaskDelay(50 / portTICK_PERIOD_MS);
-            /* Check for error */
-            if (state_voltage != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting voltage attribute failed!");
-            }
-
-            /* Write new power value */
-            esp_zb_zcl_status_t state_power = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, &power, false);
-            /* Check for error */
-            if (state_power != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting power attribute failed!");
-            }
-
-            // AC clusters z2m
-            // Write new current value
-            state_current = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID, &current, false);
-            // Check for error
-            if (state_current != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting current attribute failed!");
-            }
-
-            // Write new voltage value
-            state_voltage = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID, &voltage, false);
-            // Check for error
-            if (state_voltage != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting voltage attribute failed!");
-            }
-
-            // Write new power value
-            state_power = esp_zb_zcl_set_attribute_val(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &power, false);
-            // Check for error
-            if (state_power != ESP_ZB_ZCL_STATUS_SUCCESS)
-            {
-                ESP_LOGE(local_tag, "Setting power attribute failed!");
-            }
-
-            int_led_blink();
-            ESP_LOGI(local_tag, "temperature = %d, current = %d, voltage = %d, power = %d", CPU_temp, current, voltage, power);
-        }
+        send_update_attribute_and_ias();
 
         vTaskDelay(UPDATE_ATTRIBUTE_INTERVAL / portTICK_PERIOD_MS);
     }
@@ -676,17 +299,17 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
             // xTaskCreate(led_task, "led_task", 4096, NULL, 3, &ledTaskHandle);
             ESP_LOGI(ZIG_TAG, "Identify exit");
             break;
-        case ESP_ZB_ZCL_CLUSTER_ID_ON_OFF:
+        /*case ESP_ZB_ZCL_CLUSTER_ID_ON_OFF:
             int value = *(int *)message->attribute.data.value;
             ESP_LOGW(ZIG_TAG, "Power-on behavior %d", value);
             data.start_up_on_off = value;
             write_NVS("start_up_on_off", data.start_up_on_off);
-            break;
+            break;*/
         default:
             ESP_LOGI(ZIG_TAG, "Message data: cluster(0x%x), attribute(0x%x)  ", message->info.cluster, message->attribute.id);
         }
     }
-    bool usb_state = 0;
+    // bool usb_state = 0;
     /*if (message->info.dst_endpoint == HA_ONOFF_SWITCH_ENDPOINT)
     {
         if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
@@ -792,6 +415,123 @@ static esp_err_t zb_read_attr_resp_handler(const esp_zb_zcl_cmd_read_attr_resp_m
     return ESP_OK;
 }
 
+size_t ota_data_len_;
+size_t ota_header_len_;
+bool ota_upgrade_subelement_;
+uint8_t ota_header_[6];
+
+static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message)
+{
+    static uint32_t total_size = 0;
+    static uint32_t offset = 0;
+    static int64_t start_time = 0;
+    esp_err_t ret = ESP_OK;
+
+    if (message.info.status == ESP_ZB_ZCL_STATUS_SUCCESS)
+    {
+        switch (message.upgrade_status)
+        {
+        case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
+            ESP_LOGI(TAG, "-- OTA upgrade start");
+            start_time = esp_timer_get_time();
+            s_ota_partition = esp_ota_get_next_update_partition(NULL);
+            assert(s_ota_partition);
+            ret = esp_ota_begin(s_ota_partition, 0, &s_ota_handle);
+            ESP_RETURN_ON_ERROR(ret, TAG, "Failed to begin OTA partition, status: %s", esp_err_to_name(ret));
+            break;
+        case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_RECEIVE:
+            size_t payload_size = message.payload_size;
+            const uint8_t *payload = message.payload;
+
+            total_size = message.ota_header.image_size;
+            offset += payload_size;
+
+            ESP_LOGI(TAG, "-- OTA Client receives data: progress [%ld/%ld]", offset, total_size);
+
+            /* Read and process the first sub-element, ignoring everything else */
+            while (ota_header_len_ < 6 && payload_size > 0)
+            {
+                ota_header_[ota_header_len_] = payload[0];
+                ota_header_len_++;
+                payload++;
+                payload_size--;
+            }
+
+            if (!ota_upgrade_subelement_ && ota_header_len_ == 6)
+            {
+                if (ota_header_[0] == 0 && ota_header_[1] == 0)
+                {
+                    ota_upgrade_subelement_ = true;
+                    ota_data_len_ =
+                        (((int)ota_header_[5] & 0xFF) << 24) | (((int)ota_header_[4] & 0xFF) << 16) | (((int)ota_header_[3] & 0xFF) << 8) | ((int)ota_header_[2] & 0xFF);
+                    ESP_LOGD(TAG, "OTA sub-element size %zu", ota_data_len_);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "OTA sub-element type %02x%02x not supported", ota_header_[0], ota_header_[1]);
+                    return ESP_FAIL;
+                }
+            }
+
+            if (ota_data_len_)
+            {
+                payload_size = fmin(ota_data_len_, payload_size);
+                ota_data_len_ -= payload_size;
+
+                if (message.payload_size && message.payload)
+                {
+                    ret = esp_ota_write(s_ota_handle, payload, payload_size);
+                    ESP_RETURN_ON_ERROR(ret, TAG, "Failed to write OTA data to partition, status: %s", esp_err_to_name(ret));
+                }
+            }
+            break;
+        case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_APPLY:
+            ESP_LOGI(TAG, "-- OTA upgrade apply");
+            break;
+        case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_CHECK:
+            ret = offset == total_size ? ESP_OK : ESP_FAIL;
+            ESP_LOGI(TAG, "-- OTA upgrade check status: %s", esp_err_to_name(ret));
+            break;
+        case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_FINISH:
+            ESP_LOGI(TAG, "-- OTA Finish");
+            ESP_LOGI(TAG, "-- OTA Information: version: 0x%lx, manufacturer code: 0x%x, image type: 0x%x, total size: %ld bytes, cost time: %lld ms,",
+                     message.ota_header.file_version, message.ota_header.manufacturer_code, message.ota_header.image_type,
+                     message.ota_header.image_size, (esp_timer_get_time() - start_time) / 1000);
+            ret = esp_ota_end(s_ota_handle);
+            ESP_RETURN_ON_ERROR(ret, TAG, "Failed to end OTA partition, status: %s", esp_err_to_name(ret));
+            ret = esp_ota_set_boot_partition(s_ota_partition);
+            ESP_RETURN_ON_ERROR(ret, TAG, "Failed to set OTA boot partition, status: %s", esp_err_to_name(ret));
+            ESP_LOGW(TAG, "Prepare to restart system");
+            esp_restart();
+            break;
+        default:
+            ESP_LOGI(TAG, "OTA status: %d", message.upgrade_status);
+            break;
+        }
+    }
+    return ret;
+}
+
+static esp_err_t zb_ota_upgrade_query_image_resp_handler(esp_zb_zcl_ota_upgrade_query_image_resp_message_t message)
+{
+    esp_err_t ret = ESP_OK;
+    if (message.info.status == ESP_ZB_ZCL_STATUS_SUCCESS)
+    {
+        ESP_LOGI(TAG, "Queried OTA image from address: 0x%04hx, endpoint: %d", message.server_addr.u.short_addr, message.server_endpoint);
+        ESP_LOGI(TAG, "Image version: 0x%lx, manufacturer code: 0x%x, image size: %ld", message.file_version, message.manufacturer_code,
+                 message.image_size);
+    }
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Approving OTA image upgrade");
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Rejecting OTA image upgrade, status: %s", esp_err_to_name(ret));
+    }
+    return ret;
+}
+
 static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
 {
     esp_err_t ret = ESP_OK;
@@ -801,11 +541,23 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
         ret = esp_zb_zcl_identify_cmd_req((esp_zb_zcl_identify_cmd_t *)message);
         ESP_LOGW(TAG, "ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID");
         break;*/
+    case ESP_ZB_ZDO_SIGNAL_PRODUCTION_CONFIG_READY:
+        uint16_t manuf_id = OTA_UPGRADE_MANUFACTURER;
+        esp_zb_set_node_descriptor_manufacturer_code(manuf_id);
+        break;
     case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
         ret = zb_attribute_handler((esp_zb_zcl_set_attr_value_message_t *)message);
+        ESP_LOGW(ZIG_TAG, "CORE_SET_ATTR_VALUE_CB action(0x%x) callback", callback_id);
         break;
     case ESP_ZB_CORE_CMD_READ_ATTR_RESP_CB_ID:
         ret = zb_read_attr_resp_handler((esp_zb_zcl_cmd_read_attr_resp_message_t *)message);
+        ESP_LOGW(ZIG_TAG, "CORE_CMD_READ_ATTR_RESP_CB action(0x%x) callback", callback_id);
+        break;
+    case ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID:
+        ret = zb_ota_upgrade_status_handler(*(esp_zb_zcl_ota_upgrade_value_message_t *)message);
+        break;
+    case ESP_ZB_CORE_OTA_UPGRADE_SRV_QUERY_IMAGE_CB_ID:
+        ret = zb_ota_upgrade_query_image_resp_handler(*(esp_zb_zcl_ota_upgrade_query_image_resp_message_t *)message);
         break;
     /*case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
         ret = (esp_zb_zcl_cmd_default_resp_message_t *)message;
@@ -868,7 +620,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             send_bin_cfg_option(1, data.USB_state);
             send_bin_cfg_option(2, data.int_led_mode);
             send_bin_cfg_option(3, data.ext_led_mode);
-            send_alarm_state(data.alarm_state);
+            send_update_attribute_and_ias();
         }
         break;
     case ESP_ZB_ZDO_SIGNAL_LEAVE:
@@ -892,12 +644,8 @@ static void set_zcl_string(char *buffer, char *value)
     memcpy(buffer + 1, value, buffer[0]);
 }
 
-static void esp_zb_task(void *pvParameters)
+static void zigbee_config_endpoints_attributes()
 {
-    /* initialize Zigbee stack */
-    esp_zb_cfg_t zb_nwk_cfg = ESP_ZB_ZR_CONFIG();
-    esp_zb_init(&zb_nwk_cfg);
-
     uint16_t undefined_value;
     undefined_value = 0x8000;
 
@@ -907,11 +655,7 @@ static void esp_zb_task(void *pvParameters)
     uint16_t one_value;
     one_value = 1;
 
-    float undefined_float = 0;
-    float float_zero = 0;
-    float float_one = 1;
-
-    /* basic cluster create with fully customized */
+    // basic cluster create with fully customized
     set_zcl_string(manufacturer, HW_MANUFACTURER);
     set_zcl_string(model, HW_MODEL);
     char ota_upgrade_file_version[10];
@@ -928,25 +672,25 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_basic_cluster_add_attr(esp_zb_basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID, firmware_version);
     esp_zb_basic_cluster_add_attr(esp_zb_basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_DATE_CODE_ID, firmware_date);
 
-    /* identify cluster create with fully customized */
+    // identify cluster create with fully customized
     uint8_t identyfi_id;
     identyfi_id = 0;
     esp_zb_attribute_list_t *esp_zb_identify_cluster = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY);
     esp_zb_identify_cluster_add_attr(esp_zb_identify_cluster, ESP_ZB_ZCL_CMD_IDENTIFY_IDENTIFY_ID, &identyfi_id);
 
-    /* Electrical cluster */
+    // Electrical cluster
     esp_zb_attribute_list_t *esp_zb_electrical_meas_cluster = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT);
 
-    /* DC Electrical attributes */
+    // DC Electrical attributes
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MIN_ID, &undefined_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_MIN_ID, &undefined_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MIN_ID, &undefined_value);
 
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_DIVISOR_ID, &hundred_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_DIVISOR_ID, &hundred_value);
@@ -956,16 +700,16 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_POWER_MULTIPLIER_ID, &one_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MULTIPLIER_ID, &one_value);
 
-    /* AC Electrical attributes */
+    // AC Electrical attributes
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_MIN_ID, &undefined_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_MIN_ID, &undefined_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_MAX_ID, &undefined_value);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_MIN_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_MAX_ID, &undefined_value);
+    // esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_MIN_ID, &undefined_value);
 
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACCURRENT_DIVISOR_ID, &hundred_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_DIVISOR_ID, &hundred_value);
@@ -975,7 +719,7 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_MULTIPLIER_ID, &one_value);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_meas_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACVOLTAGE_MULTIPLIER_ID, &one_value);
 
-    /* Temperature cluster */
+    // Temperature cluster
     esp_zb_attribute_list_t *esp_zb_temperature_meas_cluster = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT);
     esp_zb_temperature_meas_cluster_add_attr(esp_zb_temperature_meas_cluster, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &undefined_value);
     esp_zb_temperature_meas_cluster_add_attr(esp_zb_temperature_meas_cluster, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_MIN_VALUE_ID, &undefined_value);
@@ -1004,7 +748,7 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_attribute_list_t *esp_zb_client_time_cluster = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_TIME);
     esp_zb_time_cluster_add_attr(esp_zb_client_time_cluster, ESP_ZB_ZCL_ATTR_TIME_LAST_SET_TIME_ID, &undefined_value);
 
-    /* IAS cluster */
+    // IAS cluster
     esp_zb_ias_zone_cluster_cfg_t ias_cluster_cfg = {
         .zone_type = ESP_ZB_ZCL_IAS_ZONE_ZONETYPE_STANDARD_CIE,
         .zone_state = ESP_ZB_ZCL_IAS_ZONE_ZONESTATE_NOT_ENROLLED,
@@ -1019,13 +763,14 @@ static void esp_zb_task(void *pvParameters)
      *  If the client values do not match with configured values then it shall discard the command and
      *  no further processing shall continue.
      */
+    uint16_t manuf_id = OTA_UPGRADE_MANUFACTURER;
     esp_zb_ota_cluster_cfg_t ota_cluster_cfg = {
         //.ota_upgrade_downloaded_file_ver = OTA_FW_VERSION,
         //.ota_upgrade_manufacturer = OTA_UPGRADE_MANUFACTURER,
         //.ota_upgrade_image_type = OTA_UPGRADE_IMAGE_TYPE,
         .ota_upgrade_file_version = OTA_FW_VERSION,        // OTA_UPGRADE_RUNNING_FILE_VERSION,
         .ota_upgrade_downloaded_file_ver = OTA_FW_VERSION, // OTA_UPGRADE_DOWNLOADED_FILE_VERSION,
-        .ota_upgrade_manufacturer = OTA_UPGRADE_MANUFACTURER,
+        .ota_upgrade_manufacturer = manuf_id,
         .ota_upgrade_image_type = OTA_UPGRADE_IMAGE_TYPE,
     };
     esp_zb_attribute_list_t *esp_zb_ota_client_cluster = esp_zb_ota_cluster_create(&ota_cluster_cfg);
@@ -1036,7 +781,20 @@ static void esp_zb_task(void *pvParameters)
         .max_data_size = OTA_UPGRADE_MAX_DATA_SIZE,
     };
 
+    uint16_t ota_upgrade_server_addr = 0xffff;
+    uint8_t ota_upgrade_server_ep = 0xff;
+    esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
+    esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
+    esp_zb_endpoint_config_t endpoint_config = {
+        .endpoint = 1,
+        .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+        .app_device_id = ESP_ZB_HA_TEST_DEVICE_ID,
+        .app_device_version = 0,
+    };
+
     esp_zb_ota_cluster_add_attr(esp_zb_ota_client_cluster, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID, (void *)&variable_config);
+    esp_zb_ota_cluster_add_attr(esp_zb_ota_client_cluster, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID, (void *)&ota_upgrade_server_addr);
+    esp_zb_ota_cluster_add_attr(esp_zb_ota_client_cluster, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID, (void *)&ota_upgrade_server_ep);
 
     /* create cluster list with ota cluster */
 
@@ -1082,6 +840,11 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_cluster_list_t *esp_zb_cluster_list2 = esp_zb_zcl_cluster_list_create();
     esp_zb_cluster_list_add_on_off_cluster(esp_zb_cluster_list2, esp_zb_on_off_cluster2, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
+    esp_zb_on_off_cluster_cfg_t on_off_cfg3 = {};
+    esp_zb_attribute_list_t *esp_zb_on_off_cluster3 = esp_zb_on_off_cluster_create(&on_off_cfg3);
+    esp_zb_cluster_list_t *esp_zb_cluster_list3 = esp_zb_zcl_cluster_list_create();
+    esp_zb_cluster_list_add_on_off_cluster(esp_zb_cluster_list3, esp_zb_on_off_cluster3, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
     esp_zb_endpoint_config_t endpoint_config1 = {
         .endpoint = SENSOR_ENDPOINT,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
@@ -1101,12 +864,27 @@ static void esp_zb_task(void *pvParameters)
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
         .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
         .app_device_version = 0};
-    esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list2, endpoint_config3);
+    esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list3, endpoint_config3);
 
     /* END */
     esp_zb_device_register(esp_zb_ep_list);
+}
+
+static void esp_zb_task(void *pvParameters)
+{
+    /* initialize Zigbee stack */
+    esp_zb_cfg_t zb_nwk_cfg = ESP_ZB_ZR_CONFIG();
+    esp_zb_init(&zb_nwk_cfg);
+
+    // float undefined_float = 0;
+    // float float_zero = 0;
+    // float float_one = 1;
+
+    zigbee_config_endpoints_attributes();
+
     esp_zb_core_action_handler_register(zb_action_handler);
     esp_zb_set_primary_network_channel_set(ESP_ZB_PRIMARY_CHANNEL_MASK);
+
     ESP_ERROR_CHECK(esp_zb_start(true));
     esp_zb_main_loop_iteration();
 }
@@ -1114,9 +892,12 @@ static void esp_zb_task(void *pvParameters)
 void app_main(void)
 {
 
+    ESP_LOGW(TAG, "FW verison 0x%x (%d) date: %s", OTA_FW_VERSION, OTA_FW_VERSION, FW_BUILD_DATE);
+
     setup_NVS();
 
-    register_button();
+    register_button_1();
+    register_button_2();
     register_alarm_input();
 
     data.int_led_mode = read_NVS("int_led_mode");
@@ -1137,10 +918,9 @@ void app_main(void)
     // ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
 
-    xTaskCreate(led_task, "led_task", 4096, NULL, 3, &ledTaskHandle);
+    xTaskCreate(led_task, "led_task", 4096, NULL, 5, &ledTaskHandle);
+    xTaskCreate(CPUtemp_task, "CPUtemp_task", 4096, NULL, 4, NULL);
     xTaskCreate(ina219_task, "ina219_task", 4096, NULL, 3, NULL);
-    xTaskCreate(CPUtemp_task, "CPUtemp_task", 4096, NULL, 3, NULL);
-
-    xTaskCreate(update_attribute, "Update_attribute_value", 4096, NULL, 2, NULL);
-    xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 1, NULL);
+    xTaskCreate(update_attribute, "update_attribute_task", 4096, NULL, 2, NULL);
+    xTaskCreate(esp_zb_task, "zigbee_main_task", 4096, NULL, 1, NULL);
 }
