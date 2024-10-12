@@ -35,8 +35,8 @@ Stay tuned for updates as we continue to expand the capabilities of ZigUSB C6, a
 ### Overview  
   
 <div align="center">
-<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/top.png">
-<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/bottom.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/top.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/bottom.png">
 </div>
 
 ### Photos
@@ -44,25 +44,25 @@ Stay tuned for updates as we continue to expand the capabilities of ZigUSB C6, a
 <table>
 <tr>
 <td width="50%">
-<img src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/top_case.jpeg">
+<img src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/top_case.jpeg">
 </td>
 <td>
-<img src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/back_case.jpeg">
+<img src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/back_case.jpeg">
 </td>
 </tr>
 </table>
 
 ### Schematic
-<div align="center"><img width="90%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/hardware/Schematic.png"></div>
+<div align="center"><img width="90%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/main/hardware/Schematic.png"></div>
   
 #### zigbee2mqtt & Home Assistant overview
 
 <table>
 <tbody>
 <tr>
-<td><img width="15%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/dash.png"></td>
-<td><img width="35%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/exposes.png"></td>
-<td><img width="45%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_С6/main/images/ha.png"></td>
+<td><img width="15%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/dash.png"></td>
+<td><img width="35%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/exposes.png"></td>
+<td><img width="45%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/ha.png"></td>
 </tr>
 </tbody>
 </table>
@@ -108,10 +108,10 @@ This work is licensed under a <a rel="license" href="http://creativecommons.org/
 
 
 ### Firmware Files
-All source files are available in this repository. Pre-built firmware files can be found in the [releases section](https://github.com/xyzroe/ZigUSB_С6/releases).
+All source files are available in this repository. Pre-built firmware files can be found in the [releases section](https://github.com/xyzroe/ZigUSB_C6/releases).
 
 ### Verified Supported Zigbee Systems
-- [zigbee2mqtt](https://www.zigbee2mqtt.io/) - Full support, still requires [external converter](https://github.com/xyzroe/ZigUSB_С6/tree/main/external_converter/ZigUSB_С6.js) ⭐⭐⭐⭐⭐
+- [zigbee2mqtt](https://www.zigbee2mqtt.io/) - Full support, still requires [external converter](https://github.com/xyzroe/ZigUSB_C6/tree/main/external_converter/ZigUSB_C6.js) ⭐⭐⭐⭐⭐
 - [HOMEd](https://wiki.homed.dev/page/HOMEd) - Partial support ⭐⭐⭐⭐
 - [ZHA](https://www.home-assistant.io/integrations/zha/) - Partial support ⭐⭐⭐⭐
 
@@ -130,4 +130,4 @@ All source files are available in this repository. Pre-built firmware files can 
 - [How-to](./CONTRIBUTE.md) 
 
 <br>  
-ZigUSB_С6 is licensed under the <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>
+ZigUSB_C6 is licensed under the <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>
