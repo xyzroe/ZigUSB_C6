@@ -24,7 +24,7 @@ Frequent use cases include converting a "dumb" USB lamp into a "smart" one, conn
 - Designed for AK-N-12 case.
   
 #### To re-pairing or reset to factory defaults:  
- **Hold touch button for more than 3 seconds** 
+ **Hold touch button for more than 5 seconds** 
 
 ### Project Goals
 
@@ -58,7 +58,7 @@ Stay tuned for updates as we continue to expand the capabilities of ZigUSB C6, a
 #### zigbee2mqtt overview
 
 <div align="center">
-<img width="35%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/dash.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/dash.png">
 <img width="55%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/refs/heads/main/images/exposes.png">
 </div>
 

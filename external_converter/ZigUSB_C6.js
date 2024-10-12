@@ -3,6 +3,7 @@ const {
   electricityMeter,
   temperature,
   identify,
+  iasZoneAlarm,
 } = require("zigbee-herdsman-converters/lib/modernExtend");
 
 const fz = require("zigbee-herdsman-converters/converters/fromZigbee");
@@ -19,10 +20,10 @@ const CONSTANTS = {
   MIN_REPORT_INTERVAL: 10,
   MAX_REPORT_INTERVAL: 90,
   REPORTABLE_CHANGE: 100,
-  TEMP_MIN_REPORT_INTERVAL: 60,
-  TEMP_MAX_REPORT_INTERVAL: 300,
-  TEMP_REPORTABLE_CHANGE: 1000,
 };
+
+const electroReporting = { min: 10, max: 90, change: 100 };
+const tempReporting = { min: 60, max: 300, change: 1000 };
 
 const fzLocal = {
   iasZoneAlarm: {
@@ -46,6 +47,18 @@ const definition = {
   toZigbee: [tz.power_on_behavior, tz.on_off],
   configure: async (device, coordinatorEndpoint) => {
     const endpoint = device.getEndpoint(1);
+
+    await reporting.bind(endpoint, coordinatorEndpoint, [
+      "genOnOff",
+      "haElectricalMeasurement",
+      "ssIasZone",
+      "msTemperatureMeasurement",
+    ]);
+
+    const endpoint2 = device.getEndpoint(2);
+    await reporting.bind(endpoint2, coordinatorEndpoint, ["genOnOff"]);
+    const endpoint3 = device.getEndpoint(3);
+    await reporting.bind(endpoint3, coordinatorEndpoint, ["genOnOff"]);
 
     await endpoint.read("haElectricalMeasurement", ["dcPowerMultiplier", "dcPowerDivisor"]);
     await endpoint.configureReporting("haElectricalMeasurement", [
@@ -136,17 +149,20 @@ const definition = {
   extend: [
     deviceEndpoints({ endpoints: { 1: 1, 2: 2, 3: 3 } }),
     identify(),
+    /*iasZoneAlarm({
+      endpointNames: ["1"],
+      zoneType: "generic",
+      zoneAttributes: ["alarm_1"],
+      description: "🔌 Indicates if overcurrent protection is triggered",
+    }),*/
     electricityMeter({
       cluster: "electrical",
       configureReporting: false,
+      //      reporting: electroReporting,
       endpointNames: ["1"],
     }),
     temperature({
-      reporting: {
-        min: CONSTANTS.TEMP_MIN_REPORT_INTERVAL,
-        max: CONSTANTS.TEMP_MAX_REPORT_INTERVAL,
-        change: CONSTANTS.TEMP_REPORTABLE_CHANGE,
-      },
+      reporting: tempReporting,
     }),
   ],
   meta: { multiEndpoint: true },
