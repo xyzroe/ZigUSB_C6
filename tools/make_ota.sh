@@ -9,10 +9,10 @@ cd ./tools
 # Install the required Python packages
 python3 -m pip install -q zigpy
 
-# Read the values from ZigUSB.h
-MANUFACTURER=$(grep -o '#define\s\+OTA_UPGRADE_MANUFACTURER\s\+0x[0-9a-fA-F]\+' ../main/ZigUSB.h | awk '{print $3}')
-IMAGE_TYPE=$(grep -o '#define\s\+OTA_UPGRADE_IMAGE_TYPE\s\+0x[0-9a-fA-F]\+' ../main/ZigUSB.h | awk '{print $3}')
-FILE_VERSION=$(grep -o '#define\s\+OTA_FW_VERSION\s\+0x[0-9a-fA-F]\+' ../main/ZigUSB.h | awk '{print $3}')
+# Read the values from const.h
+MANUFACTURER=$(grep -o '#define\s\+OTA_UPGRADE_MANUFACTURER\s\+0x[0-9a-fA-F]\+' ../main/const.h | awk '{print $3}')
+IMAGE_TYPE=$(grep -o '#define\s\+OTA_UPGRADE_IMAGE_TYPE\s\+0x[0-9a-fA-F]\+' ../main/const.h | awk '{print $3}')
+FILE_VERSION=$(grep -o '#define\s\+OTA_FW_VERSION\s\+0x[0-9a-fA-F]\+' ../main/const.h | awk '{print $3}')
 
 # Check if the ZigUSB.bin file exists
 if [ ! -f "../build/ZigUSB.bin" ]; then

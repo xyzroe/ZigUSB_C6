@@ -46,7 +46,11 @@
     "nvs_flash.h": "c",
     "task.h": "c",
     "esp_log.h": "c",
-    "string.h": "c"
+    "string.h": "c",
+    "esp_zigbee_zcl_on_off_switch_config.h": "c",
+    "esp_zigbee_zcl_on_off.h": "c",
+    "esp_zigbee_type.h": "c",
+    "esp_ota_ops.h": "c"
   },
   "editor.formatOnSave": true,
   "idf.port": "/dev/tty.usbmodemflip_Elevlox1",

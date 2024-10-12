@@ -36,6 +36,6 @@ echo "version=$version_number" >> $GITHUB_ENV
 # Set the output date variable
 echo "build_date=$current_date" >> $GITHUB_ENV
 
-# Update the device version in ZigUSB.h using awk
-awk -v hex_version="$hex_version" '/OTA_FW_VERSION/ {sub(/0x[0-9A-F]*/, "0x" hex_version)} 1' main/ZigUSB.h > temp && mv temp main/ZigUSB.h
-awk -v fw_date="$current_date" '/FW_BUILD_DATE/ {sub(/"[^"]*"/, "\"" fw_date "\"")} 1' main/ZigUSB.h > temp && mv temp main/ZigUSB.h
+# Update the device version in const.h using awk
+awk -v hex_version="$hex_version" '/OTA_FW_VERSION/ {sub(/0x[0-9A-F]*/, "0x" hex_version)} 1' main/const.h > temp && mv temp main/const.h
+awk -v fw_date="$current_date" '/FW_BUILD_DATE/ {sub(/"[^"]*"/, "\"" fw_date "\"")} 1' main/const.h > temp && mv temp main/const.h
