@@ -41,16 +41,10 @@ Stay tuned for updates as we continue to expand the capabilities of ZigUSB C6, a
 
 ### Photos
 
-<table>
-<tr>
-<td width="50%">
-<img src="./images/top_case.jpeg">
-</td>
-<td>
-<img src="./images/back_case.jpeg">
-</td>
-</tr>
-</table>
+<div align="center">
+<img width="40%" src="./images/top_case.jpeg">
+<img width="40%" src="./images/back_case.jpeg">
+</div>
 
 ### Schematic
 <div align="center"><img width="90%" src="./hardware/Schematic.png"></div>
