@@ -50,7 +50,15 @@
     "esp_zigbee_zcl_on_off_switch_config.h": "c",
     "esp_zigbee_zcl_on_off.h": "c",
     "esp_zigbee_type.h": "c",
-    "esp_ota_ops.h": "c"
+    "esp_ota_ops.h": "c",
+    "esp_zigbee_attribute.h": "c",
+    "time.h": "c",
+    "esp_timer.h": "c",
+    "zboss_api.h": "c",
+    "zboss_api_aps.h": "c",
+    "esp_zigbee_zcl_command.h": "c",
+    "esp_zigbee_aps.h": "c",
+    "zb_zcl_common.h": "c"
   },
   "editor.formatOnSave": true,
   "idf.port": "/dev/tty.usbmodemflip_Elevlox1",

@@ -14,6 +14,9 @@
 #include "ha/esp_zigbee_ha_standard.h"
 #include "esp_timer.h"
 #include "esp_ota_ops.h"
+#include "zboss_api.h"
+#include "zcl/esp_zigbee_zcl_command.h"
+#include "zcl/zb_zcl_common.h"
 
 #include "main.h"
 #include "const.h"
@@ -188,9 +191,10 @@ void force_update()
 
             ESP_LOGI(__func__, "temperature = %d, current = %d, voltage = %d, power = %d", CPU_temp, current, voltage, power);
 
-            send_bin_cfg_option(1, data.USB_state);
-            send_bin_cfg_option(2, data.int_led_mode);
-            send_bin_cfg_option(3, data.ext_led_mode);
+            send_bin_cfg_option(SENSOR_ENDPOINT, data.USB_state);
+            send_bin_cfg_option(INT_LED_ENDPOINT, data.int_led_mode);
+            send_bin_cfg_option(EXT_LED_ENDPOINT, data.ext_led_mode);
+            send_bin_cfg_option(INV_USB_ENDPOINT, 0);
 
             send_alarm_state(data.alarm_state);
 
@@ -247,6 +251,9 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
 
             data.int_led_mode = old_int_led_mode;
 
+            uint16_t timer = 0;
+            update_attribute_value(SENSOR_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_CMD_IDENTIFY_IDENTIFY_ID, &timer, "Identify");
+
             ESP_LOGI(__func__, "Identify exit");
             break;
         case ESP_ZB_ZCL_CLUSTER_ID_ON_OFF:
@@ -263,6 +270,14 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
                 {
                     ESP_LOGE(__func__, "Invalid power-on behavior value: %d", value);
                 }
+            }
+            if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_TIME)
+            {
+                ESP_LOGI(__func__, "On time %d", *(int *)message->attribute.data.value);
+            }
+            if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_OFF_WAIT_TIME)
+            {
+                ESP_LOGI(__func__, "Off wait time %d", *(int *)message->attribute.data.value);
             }
             break;
         default:
@@ -284,7 +299,7 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
     }*/
     if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
     {
-
+        // ESP_LOGI(__func__, "Message data: cluster(0x%x), attribute(0x%x)  ", message->info.cluster, message->attribute.id);
         if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_BOOL)
         {
             if (message->info.dst_endpoint == SENSOR_ENDPOINT)
@@ -322,6 +337,13 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
                     }
                     data.ext_led_mode = switch_state;
                     write_NVS("ext_led_mode", switch_state);
+                }
+                else if (message->info.dst_endpoint == INV_USB_ENDPOINT)
+                {
+                    // inverted logic to make possible onWithOff work
+                    bool new_state = !(switch_state);
+                    usb_driver_set_power(new_state);
+                    send_bin_cfg_option(SENSOR_ENDPOINT, new_state);
                 }
             }
         }
@@ -496,17 +518,20 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
     esp_err_t ret = ESP_OK;
     switch (callback_id)
     {
-    /*case ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID:
-        ret = esp_zb_zcl_identify_cmd_req((esp_zb_zcl_identify_cmd_t *)message);
-        ESP_LOGW(__func__, "ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID");
-        break;*/
+    // case ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID:
+    // ret = esp_zb_zcl_identify_cmd_req((esp_zb_zcl_identify_cmd_t *)message);
+    // ESP_LOGW(__func__, "ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID");
+    // break;
+    case ESP_ZB_CORE_CMD_WRITE_ATTR_RESP_CB_ID:
+        ESP_LOGW(__func__, "ESP_ZB_CORE_CMD_WRITE_ATTR_RESP_CB_ID");
+        break;
     case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
         ret = zb_attribute_handler((esp_zb_zcl_set_attr_value_message_t *)message);
-        // ESP_LOGW(__func__, "CORE_SET_ATTR_VALUE_CB action(0x%x) callback", callback_id);
+        ESP_LOGW(__func__, "CORE_SET_ATTR_VALUE_CB action(0x%x) callback", callback_id);
         break;
     case ESP_ZB_CORE_CMD_READ_ATTR_RESP_CB_ID:
         ret = zb_read_attr_resp_handler((esp_zb_zcl_cmd_read_attr_resp_message_t *)message);
-        // ESP_LOGW(__func__, "CORE_CMD_READ_ATTR_RESP_CB action(0x%x) callback", callback_id);
+        ESP_LOGW(__func__, "CORE_CMD_READ_ATTR_RESP_CB action(0x%x) callback", callback_id);
         break;
     case ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID:
         ret = zb_ota_upgrade_status_handler(*(esp_zb_zcl_ota_upgrade_value_message_t *)message);
@@ -604,6 +629,9 @@ static void zigbee_config_endpoints_attributes()
 
     uint32_t one_value;
     one_value = 1;
+
+    uint32_t zero_value;
+    zero_value = 0;
 
     // basic cluster create with fully customized
     set_zcl_string(manufacturer, HW_MANUFACTURER);
@@ -750,6 +778,9 @@ static void zigbee_config_endpoints_attributes()
 
     // uint8_t default_value = 0xff;
     esp_zb_on_off_cluster_add_attr(esp_zb_on_off_cluster, ESP_ZB_ZCL_ATTR_ON_OFF_START_UP_ON_OFF, &data.start_up_on_off);
+
+    esp_zb_on_off_cluster_add_attr(esp_zb_on_off_cluster, ESP_ZB_ZCL_ATTR_ON_OFF_ON_TIME, &undefined_value);
+    esp_zb_on_off_cluster_add_attr(esp_zb_on_off_cluster, ESP_ZB_ZCL_ATTR_ON_OFF_OFF_WAIT_TIME, &undefined_value);
     // esp_zb_on_off_cluster_cfg_t
     // esp_zb_on_off_cluster_add_attr(&on_off_cfg,
 
@@ -792,6 +823,13 @@ static void zigbee_config_endpoints_attributes()
     esp_zb_cluster_list_t *esp_zb_cluster_list3 = esp_zb_zcl_cluster_list_create();
     esp_zb_cluster_list_add_on_off_cluster(esp_zb_cluster_list3, esp_zb_on_off_cluster3, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
+    esp_zb_on_off_cluster_cfg_t on_off_cfg4 = {};
+    esp_zb_attribute_list_t *esp_zb_on_off_cluster4 = esp_zb_on_off_cluster_create(&on_off_cfg4);
+    esp_zb_on_off_cluster_add_attr(esp_zb_on_off_cluster4, ESP_ZB_ZCL_ATTR_ON_OFF_ON_TIME, &zero_value);
+    esp_zb_on_off_cluster_add_attr(esp_zb_on_off_cluster4, ESP_ZB_ZCL_ATTR_ON_OFF_OFF_WAIT_TIME, &zero_value);
+    esp_zb_cluster_list_t *esp_zb_cluster_list4 = esp_zb_zcl_cluster_list_create();
+    esp_zb_cluster_list_add_on_off_cluster(esp_zb_cluster_list4, esp_zb_on_off_cluster4, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
     esp_zb_endpoint_config_t endpoint_config1 = {
         .endpoint = SENSOR_ENDPOINT,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
@@ -813,6 +851,13 @@ static void zigbee_config_endpoints_attributes()
         .app_device_version = 0};
     esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list3, endpoint_config3);
 
+    esp_zb_endpoint_config_t endpoint_config4 = {
+        .endpoint = INV_USB_ENDPOINT,
+        .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+        .app_device_id = ESP_ZB_HA_ON_OFF_OUTPUT_DEVICE_ID,
+        .app_device_version = 0};
+    esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list4, endpoint_config4);
+
     /* END */
     esp_zb_device_register(esp_zb_ep_list);
 }
@@ -826,9 +871,11 @@ static void esp_zb_task(void *pvParameters)
     zigbee_config_endpoints_attributes();
 
     esp_zb_core_action_handler_register(zb_action_handler);
+
     esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK);
 
     ESP_ERROR_CHECK(esp_zb_start(true));
+
     esp_zb_main_loop_iteration();
 }
 

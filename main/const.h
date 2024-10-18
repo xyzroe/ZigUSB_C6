@@ -21,9 +21,10 @@
 #define SENSOR_ENDPOINT 1  /* the endpoint number for the sensor */
 #define INT_LED_ENDPOINT 2 /* the endpoint number for the internal LED */
 #define EXT_LED_ENDPOINT 3 /* the endpoint number for the external LED */
+#define INV_USB_ENDPOINT 4 /* the endpoint number for the USB switch (inverted logic) */
 
-#define OTA_FW_VERSION 0x00000137 /* The attribute indicates the version of the firmware */
-#define FW_BUILD_DATE "20241012"  /* The parameter indicates the build date of the firmware */
+#define OTA_FW_VERSION 0x0000013D /* The attribute indicates the version of the firmware */
+#define FW_BUILD_DATE "20241018"  /* The parameter indicates the build date of the firmware */
 
 /* GPIO configuration */
 #define BTN_GPIO_1 5                 /* Button from v0.3 */

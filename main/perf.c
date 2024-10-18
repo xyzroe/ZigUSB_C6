@@ -195,7 +195,7 @@ static void button_single_click_cb(void *arg, void *usr_data)
     bool new_state = !(data.USB_state);
 
     usb_driver_set_power(new_state);
-    send_bin_cfg_option(1, new_state);
+    send_bin_cfg_option(SENSOR_ENDPOINT, new_state);
 }
 
 static void button_long_press_cb(void *arg, void *usr_data)
