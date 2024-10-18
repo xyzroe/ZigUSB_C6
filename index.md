@@ -4,11 +4,11 @@ hide_title: true
 hide: true                          
 ---
 
-<div align="center"> 
-<a href="https://github.com/xyzroe/ZigUSB_C6/releases"><img src="https://img.shields.io/github/release/xyzroe/ZigUSB_C6.svg" alt="GitHub version"></a>
-<a href="https://github.com/xyzroe/ZigUSB_C6/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/xyzroe/ZigUSB_C6/build.yml" alt="GitHub Actions Workflow Status"></a>
-<a href="https://github.com/xyzroe/ZigUSB_C6/releases/latest"><img src="https://img.shields.io/github/downloads/xyzroe/ZigUSB_C6/total.svg" alt="GitHub download"></a>
-<a href="https://github.com/xyzroe/ZigUSB_C6/issues"><img src="https://img.shields.io/github/issues/xyzroe/ZigUSB_C6" alt="GitHub Issues or Pull Requests"></a>
+<div align="center" style="display: flex; flex-wrap: nowrap; justify-content: center; align-items: center;"> 
+    <a href="https://github.com/xyzroe/ZigUSB_C6/releases"><img src="https://img.shields.io/github/release/xyzroe/ZigUSB_C6.svg" alt="GitHub version"></a>
+    <a href="https://github.com/xyzroe/ZigUSB_C6/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/xyzroe/ZigUSB_C6/build.yml" alt="GitHub Actions Workflow Status"></a>
+    <a href="https://github.com/xyzroe/ZigUSB_C6/releases/latest"><img src="https://img.shields.io/github/downloads/xyzroe/ZigUSB_C6/total.svg" alt="GitHub download"></a>
+    <a href="https://github.com/xyzroe/ZigUSB_C6/issues"><img src="https://img.shields.io/github/issues/xyzroe/ZigUSB_C6" alt="GitHub Issues or Pull Requests"></a>
 </div>
 
 The ZigUSB C6 project is an innovative solution designed to enhance the control and monitoring of USB-powered devices through Zigbee communication. This project aims to provide a seamless integration for smart home enthusiasts and professionals alike, enabling remote control, automation, and monitoring of USB devices in a Zigbee-enabled ecosystem. 
