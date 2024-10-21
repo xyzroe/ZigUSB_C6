@@ -15,6 +15,10 @@
 #define OTA_UPGRADE_HW_VERSION 0x0101   /* The parameter indicates the version of hardware */
 #define OTA_UPGRADE_MAX_DATA_SIZE 64    /* The parameter indicates the maximum data size of query block image */
 
+#define MAX_CHILDREN 10                                                  /* the max amount of connected devices */
+#define INSTALLCODE_POLICY_ENABLE false                                  /* enable the install code policy for security */
+#define ESP_ZB_PRIMARY_CHANNEL_MASK ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK /* Zigbee primary channel mask use in the example */
+
 #define HW_MANUFACTURER "xyzroe" /* The parameter indicates the manufacturer of the device */
 #define HW_MODEL "ZigUSB_C6"     /* The parameter indicates the model of the device */
 
@@ -23,8 +27,8 @@
 #define EXT_LED_ENDPOINT 3 /* the endpoint number for the external LED */
 #define INV_USB_ENDPOINT 4 /* the endpoint number for the USB switch (inverted logic) */
 
-#define OTA_FW_VERSION 0x0000013D /* The attribute indicates the version of the firmware */
-#define FW_BUILD_DATE "20241018"  /* The parameter indicates the build date of the firmware */
+#define OTA_FW_VERSION 0x00000140 /* The attribute indicates the version of the firmware */
+#define FW_BUILD_DATE "20241021"  /* The parameter indicates the build date of the firmware */
 
 /* GPIO configuration */
 #define BTN_GPIO_1 5                 /* Button from v0.3 */
@@ -46,5 +50,6 @@
 #define SHORT_PRESS_TIME 150             /* to toggle USB power */
 #define UPDATE_ATTRIBUTE_INTERVAL 600000 /* 10 minutes to FORCE update all states */
 #define WAIT_BEFORE_FIRST_UPDATE 15000   /* 15 seconds to wait before first update */
+#define DEBUG_TASK_INTERVAL 60000        /* Debug task interval */
 
 #endif // CONST_H

@@ -11,6 +11,7 @@
 #include "const.h"
 #include "perf.h"
 #include "tools.h"
+#include "zigbee.h"
 
 void init_outputs()
 {

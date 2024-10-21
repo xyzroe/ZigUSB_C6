@@ -1,14 +1,19 @@
 
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "esp_chip_info.h"
+#include "esp_flash.h"
+#include "esp_system.h"
+#include "esp_mac.h"
 #include <time.h>
 #include "string.h"
 
 #include "main.h"
 #include "tools.h"
 #include "const.h"
+#include "zigbee.h"
 
-static void get_rtc_time()
+void get_rtc_time()
 {
     time_t now;
     struct tm timeinfo;
@@ -158,4 +163,115 @@ float random_float(float min, float max)
 float round_to_4_decimals(float value)
 {
     return roundf(value * 10000) / 10000;
+}
+
+void set_zcl_string(char *buffer, char *value)
+{
+    buffer[0] = (char)strlen(value);
+    memcpy(buffer + 1, value, buffer[0]);
+}
+
+void print_chip_info()
+{
+    esp_chip_info_t chip_info;
+    uint32_t flash_size;
+    uint8_t mac[6];
+
+    esp_chip_info(&chip_info);
+
+    ESP_LOGW(__func__, "This is %s chip with %d CPU core(s), %s%s%s%s, ",
+             CONFIG_IDF_TARGET,
+             chip_info.cores,
+             (chip_info.features & CHIP_FEATURE_WIFI_BGN) ? "WiFi/" : "",
+             (chip_info.features & CHIP_FEATURE_BT) ? "BT" : "",
+             (chip_info.features & CHIP_FEATURE_BLE) ? "BLE" : "",
+             (chip_info.features & CHIP_FEATURE_IEEE802154) ? ", 802.15.4 (Zigbee/Thread)" : "");
+
+    unsigned major_rev = chip_info.revision / 100;
+    unsigned minor_rev = chip_info.revision % 100;
+    ESP_LOGW(__func__, "Silicon revision v%d.%d", major_rev, minor_rev);
+
+    if (esp_flash_get_size(NULL, &flash_size) != ESP_OK)
+    {
+        ESP_LOGE(__func__, "Get flash size failed");
+        return;
+    }
+
+    ESP_LOGW(__func__, "%" PRIu32 "MB %s flash",
+             flash_size / (uint32_t)(1024 * 1024),
+             (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+    ESP_LOGW(__func__, "Minimum free heap size: %" PRIu32 " bytes", esp_get_minimum_free_heap_size());
+
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK)
+    {
+        ESP_LOGW(__func__, "Base MAC (WiFi STA): %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+    else if (esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP) == ESP_OK)
+    {
+        ESP_LOGW(__func__, "Base MAC (WiFi SoftAP): %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+    else if (esp_read_mac(mac, ESP_MAC_BT) == ESP_OK)
+    {
+        ESP_LOGW(__func__, "Base MAC (Bluetooth): %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+    else if (esp_read_mac(mac, ESP_MAC_ETH) == ESP_OK)
+    {
+        ESP_LOGW(__func__, "Base MAC (Ethernet): %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    }
+    else
+    {
+        ESP_LOGE(__func__, "Failed to get any MAC address");
+    }
+}
+
+void heap_stats()
+{
+    multi_heap_info_t heap_info;
+    heap_caps_get_info(&heap_info, MALLOC_CAP_8BIT);
+
+    size_t total_heap_size = heap_caps_get_total_size(MALLOC_CAP_8BIT);
+    size_t free_heap_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    size_t largest_free_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    size_t minimum_free_size = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+
+    float frag_heap_percentage = 0.0;
+    if (free_heap_size > 0)
+    {
+        frag_heap_percentage = (1.0 - ((float)largest_free_block / (float)free_heap_size)) * 100.0;
+    }
+
+    float free_heap_percentage = ((float)free_heap_size / (float)total_heap_size) * 100.0;
+
+    ESP_LOGI(__func__, "total: %d, free: %d, largest free block: %d, minimum free size: %d",
+             total_heap_size,
+             free_heap_size,
+             largest_free_block,
+             minimum_free_size);
+
+    ESP_LOGW(__func__, "free: %.2f%% (%d bytes), fragmentation: %.2f%%",
+             free_heap_percentage,
+             free_heap_size,
+             frag_heap_percentage);
+}
+
+void debug_task(void *pvParameters)
+{
+    ESP_LOGW(__func__, "started");
+    while (1)
+    {
+        heap_stats();
+        if (connected)
+        {
+            if (!time_updated)
+            {
+                ESP_LOGE(__func__, "Time not updated yet");
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(DEBUG_TASK_INTERVAL));
+    }
 }

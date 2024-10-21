@@ -58,7 +58,10 @@
     "zboss_api_aps.h": "c",
     "esp_zigbee_zcl_command.h": "c",
     "esp_zigbee_aps.h": "c",
-    "zb_zcl_common.h": "c"
+    "zb_zcl_common.h": "c",
+    "tools.h": "c",
+    "freertos.h": "c",
+    "zigbee.h": "c"
   },
   "editor.formatOnSave": true,
   "idf.port": "/dev/tty.usbmodemflip_Elevlox1",
