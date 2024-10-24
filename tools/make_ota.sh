@@ -29,7 +29,12 @@ mkdir -p ../output
 # Create the OTA file
 python3 create-ota.py -m "$MANUFACTURER" -i "$IMAGE_TYPE" -v "$FILE_VERSION" ../build/ZigUSB.bin ../output/ZigUSB_C6.ota
 
-# Copy the ZigUSB.bin file to the output folder
-cp ../build/ZigUSB.bin ../output/ZigUSB_C6.bin
+# Create a combined binary file
+esptool.py --chip esp32 merge_bin -o ../output/ZigUSB_C6.bin \
+--flash_mode dio --flash_freq 40m --flash_size 4MB \
+0x0 ../build/bootloader/bootloader.bin \
+0x8000 ../build/partition_table/partition-table.bin \
+0xf000 ../build/ota_data_initial.bin \
+0x20000 ../build/ZigUSB.bin
 
-echo "OTA file created successfully! Version: $FILE_VERSION"
+echo "OTA file and combined binary created successfully! Version: $FILE_VERSION"

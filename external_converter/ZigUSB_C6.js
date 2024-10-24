@@ -16,15 +16,6 @@ const globalStore = require("zigbee-herdsman-converters/lib/store");
 const e = exposes.presets;
 const ea = exposes.access;
 
-const CONSTANTS = {
-  MIN_REPORT_INTERVAL: 10,
-  MAX_REPORT_INTERVAL: 90,
-  REPORTABLE_CHANGE: 100,
-};
-
-const electroReporting = { min: 10, max: 90, change: 100 };
-const tempReporting = { min: 60, max: 300, change: 1000 };
-
 const fzLocal = {
   iasZoneAlarm: {
     cluster: "ssIasZone",
