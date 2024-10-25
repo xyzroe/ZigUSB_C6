@@ -1,0 +1,11 @@
+# Ignore markdown files for language statistics
+*.md linguist-documentation
+
+# Ignore all files in the .github directory for language statistics
+.github/* linguist-generated
+
+# Ignore specific scripts
+.github/scripts/*.py linguist-generated
+
+# Ignore YAML workflow files
+.github/workflows/*.yml linguist-generated
