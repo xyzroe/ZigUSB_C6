@@ -282,11 +282,11 @@ loadFirmwareVersions();
 }
 </style>
 
-### Firmware Files
+#### Firmware Files
 
 All source files are available in this repository. Pre-built firmware files can be found in the [releases section](https://github.com/xyzroe/ZigUSB_C6/releases).
 
-#### OTA
+### OTA
 
 ##### zigbee2mqtt
 
