@@ -25,7 +25,8 @@ jobs:
 
     - name: Run pages.py script
       run: |
-        python .github/scripts/pages.py
+        cd .github/scripts/
+        python pages.py
 
     - name: Commit and push changes
       run: |
