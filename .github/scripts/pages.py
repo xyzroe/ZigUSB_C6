@@ -1,5 +1,6 @@
 import re
 import os
+import subprocess
 
 # Step 1: Read the content of index.md
 with open('../../index.md', 'r', encoding='utf-8') as file:
@@ -8,9 +9,12 @@ with open('../../index.md', 'r', encoding='utf-8') as file:
 # Step 2: Remove the block ---
 index_content = re.sub(r'---\nlayout: page\nhide_title: true\nhide: true\n---\n', '', index_content)
 
-# Step 3: Get the repository name from the link in index.md
-repo_name_match = re.search(r'https://github\.com/[^/]+/([^/]+)/', index_content)
-repo_name = repo_name_match.group(1) if repo_name_match else 'имя_репозитория'
+# Step 3: Get the repository name using Git
+try:
+    repo_name = subprocess.check_output(['git', 'config', '--get', 'remote.origin.url']).decode('utf-8').strip()
+    repo_name = repo_name.split('/')[-1].replace('.git', '')
+except subprocess.CalledProcessError:
+    repo_name = 'not found repository name'
 
 # Step 4: Replace the content of the ### Web Flasher block
 index_content = re.sub(r'(### Web Flasher\n)(.*?)(?=\n# |\n## |\n### |\n#### |\n##### )', 
