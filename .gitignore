@@ -30,3 +30,7 @@ output/
 
 # Commit message
 commit.md
+
+_site/
+./vscode/settings.json
+Gemfile.lock
