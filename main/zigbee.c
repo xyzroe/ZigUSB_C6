@@ -24,6 +24,7 @@
 #include "perf.h"
 #include "tools.h"
 #include "zigbee.h"
+#include "ota.h"
 
 /*------ Global definitions -----------*/
 
@@ -310,6 +311,7 @@ size_t ota_header_len_;
 bool ota_upgrade_subelement_;
 uint8_t ota_header_[6];
 
+/*
 static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message)
 {
     static uint32_t total_size = 0;
@@ -338,7 +340,7 @@ static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_mess
 
             ESP_LOGI(__func__, "-- OTA Client receives data: progress [%ld/%ld]", offset, total_size);
 
-            /* Read and process the first sub-element, ignoring everything else */
+            // Read and process the first sub-element, ignoring everything else 
             while (ota_header_len_ < 6 && payload_size > 0)
             {
                 ota_header_[ota_header_len_] = payload[0];
@@ -401,6 +403,7 @@ static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_mess
     }
     return ret;
 }
+*/
 
 static esp_err_t zb_ota_upgrade_query_image_resp_handler(esp_zb_zcl_ota_upgrade_query_image_resp_message_t message)
 {
@@ -421,6 +424,7 @@ static esp_err_t zb_ota_upgrade_query_image_resp_handler(esp_zb_zcl_ota_upgrade_
     }
     return ret;
 }
+
 
 static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
 {

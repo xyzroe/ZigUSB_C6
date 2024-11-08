@@ -26,10 +26,10 @@ def create(filename, manufacturer_id, image_type, file_version, header_string):
 	with open(filename, "rb") as f:
 		data = f.read()
 
-	#zobj = zlib.compressobj(level=zlib.Z_BEST_COMPRESSION)
-	#zdata = zobj.compress(data)
-	#zdata += zobj.flush()
-	zdata = data
+	zobj = zlib.compressobj(level=zlib.Z_BEST_COMPRESSION)
+	zdata = zobj.compress(data)
+	zdata += zobj.flush()
+	#zdata = data
 
 	image = zigpy.ota.image.OTAImage(
 		header=zigpy.ota.image.OTAImageHeader(

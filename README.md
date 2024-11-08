@@ -117,9 +117,10 @@ ota:
 
 ### Verified Supported Zigbee Systems
 
-- [zigbee2mqtt](https://www.zigbee2mqtt.io/) - Full support, still requires [external converter](https://github.com/xyzroe/ZigUSB_C6/tree/main/external_converter/ZigUSB_C6.js) ⭐⭐⭐⭐⭐
+- [zigbee2mqtt](https://www.zigbee2mqtt.io/) - Full support, no longer requires an [external converter](https://github.com/xyzroe/ZigUSB_C6/tree/main/external_converter/ZigUSB_C6.js) ⭐⭐⭐⭐⭐
 - [HOMEd](https://wiki.homed.dev/page/HOMEd) - Partial support ⭐⭐⭐⭐
 - [ZHA](https://www.home-assistant.io/integrations/zha/) - Partial support ⭐⭐⭐⭐
+- Other systems must be tested. The device uses standard clusters and attributes, so most coordinators can support it out of the box.
 
 ### Where to buy?
 

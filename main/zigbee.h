@@ -57,7 +57,7 @@ extern "C"
 
     static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message);
     static esp_err_t zb_read_attr_resp_handler(const esp_zb_zcl_cmd_read_attr_resp_message_t *message);
-    static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message);
+    //static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message);
     static esp_err_t zb_ota_upgrade_query_image_resp_handler(esp_zb_zcl_ota_upgrade_query_image_resp_message_t message);
     static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message);
 
