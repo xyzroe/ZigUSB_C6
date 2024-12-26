@@ -147,7 +147,6 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         const flashOptions = {
             transport: transport,
             baudrate: parseInt(460800),
-            enableTracing: false,
             debugLogging: false,
         };
 
@@ -189,7 +188,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
         const flashOptions = {
             fileArray: [{ data: firmwareString, address: 0x0000 }],
             flashSize: "keep",
-            eraseAll: true,
+            eraseAll: false,
             compress: true,
             reportProgress: (fileIndex, written, total) => {
                 progressBar.value = (written / total) * 100;
