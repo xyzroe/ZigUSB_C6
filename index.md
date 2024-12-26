@@ -146,25 +146,23 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         console.log({ esploader, transport, device, chip });
         
         if (esploader || transport || device || chip) {
+            console.log("if");
             statusMessage.textContent = 'Port is open...';
-            
             chip = await esploader.detectChip();
         }
         else {
+            console.log("else");
             statusMessage.textContent = 'Select port';
             device = await navigator.serial.requestPort({});
-            
             transport = new Transport(device);
-            
             const flashOptions = {
                 transport: transport,
                 baudrate: parseInt(460800),
                 enableTracing: false,
-                debugLogging: true,
+                debugLogging: false,
             };
             
             statusMessage.textContent = 'Connecting...';
-            
             esploader = new ESPLoader(flashOptions);
             chip = await esploader.main();
         }
