@@ -138,10 +138,11 @@ let device = null;
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const connectButton = document.getElementById('connectButton');
-
+    
     try {
         connectButton.disabled = true;
-
+        let chip = "?";
+        
         if (transport && device) {
             statusMessage.textContent = 'Port is open...';
             
