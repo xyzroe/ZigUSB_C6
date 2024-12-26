@@ -134,6 +134,7 @@ async function loadFirmwareVersions() {
 let esploader = null;
 let transport = null;
 let device = null;
+    
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const connectButton = document.getElementById('connectButton');
@@ -142,28 +143,29 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         connectButton.disabled = true;
 
         if (transport && device) {
-            statusMessage.textContent = 'Already connected. Reusing transport.';
-            document.getElementById('flashButton').disabled = false;
+            statusMessage.textContent = 'Port is open...';
+            
+            let chip = await esploader.detectChip();
         }
         else {
             statusMessage.textContent = 'Select port';
             device = await navigator.serial.requestPort({});
+            
             transport = new Transport(device);
+            
+            const flashOptions = {
+                transport: transport,
+                baudrate: parseInt(460800),
+                enableTracing: false,
+                debugLogging: true,
+            };
+            
+            statusMessage.textContent = 'Connecting...';
+            
+            esploader = new ESPLoader(flashOptions);
+            let chip = await esploader.main();
         }
         
-        statusMessage.textContent = 'Connecting...';
-        
-        const flashOptions = {
-            transport: transport,
-            baudrate: parseInt(460800),
-            enableTracing: false,
-            debugLogging: true,
-        };
-
-        esploader = new ESPLoader(flashOptions);
-
-        let chip = await esploader.main();
-
         document.getElementById('flashButton').disabled = false;
         statusMessage.textContent = 'Connected to: ' + chip;
 
