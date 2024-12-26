@@ -134,15 +134,26 @@ async function loadFirmwareVersions() {
 let esploader = null;
 let transport = null;
 let device = null;
-
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const connectButton = document.getElementById('connectButton');
+
     try {
         connectButton.disabled = true;
+
+        // Если транспорт уже создан и подключен
+        if (transport && device) {
+            statusMessage.textContent = 'Already connected. Reusing transport.';
+            document.getElementById('flashButton').disabled = false;
+            return;
+        }
+
         statusMessage.textContent = 'Select port';
 
+        // Если устройства ещё нет, открываем новое подключение
         device = await navigator.serial.requestPort({});
+        await device.open({ baudRate: 460800 });
+
         transport = new Transport(device);
         statusMessage.textContent = 'Connecting...';
 
@@ -155,10 +166,11 @@ document.getElementById('connectButton').addEventListener('click', async () => {
 
         esploader = new ESPLoader(flashOptions);
 
-        let chip = await esploader.main();
+        // Определяем тип микроконтроллера
+        const chip = await esploader.main();
 
         document.getElementById('flashButton').disabled = false;
-        statusMessage.textContent = 'Connected to: '  + chip;
+        statusMessage.textContent = 'Connected to: ' + chip;
 
     } catch (error) {
         console.error('Error connecting to device:', error);
@@ -166,31 +178,6 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         connectButton.disabled = false;
     }
 });
-
-async function closeDevicePort(device) {
-    if (!device) return;
-
-    try {
-        if (device.readable && device.readable.locked) {
-            console.log("Releasing readable stream...");
-            const reader = device.readable.getReader();
-            await reader.cancel(); 
-            reader.releaseLock();
-        }
-
-        if (device.writable && device.writable.locked) {
-            console.log("Releasing writable stream...");
-            const writer = device.writable.getWriter(); 
-            writer.releaseLock(); 
-        }
-
-        console.log("Closing the device port...");
-        await device.close();
-        console.log("Device port closed successfully.");
-    } catch (error) {
-        console.error("Error closing device port:", error);
-    }
-}
     
 document.getElementById('flashButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
@@ -234,16 +221,11 @@ document.getElementById('flashButton').addEventListener('click', async () => {
     } finally {
         progressBar.style.display = 'none';
 
-        await closeDevicePort(device);
-
-        esploader = null;
-        transport = null;
-        device = null;
-
         document.getElementById('connectButton').disabled = false;
         document.getElementById('flashButton').disabled = true;
     }
 });
+
 
 
 function showSerialHelp() {
