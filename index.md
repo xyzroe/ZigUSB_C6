@@ -134,6 +134,7 @@ async function loadFirmwareVersions() {
 let esploader = null;
 let transport = null;
 let device = null;
+let chip = null;
     
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
@@ -141,9 +142,9 @@ document.getElementById('connectButton').addEventListener('click', async () => {
     
     try {
         connectButton.disabled = true;
-        let chip = "?";
         
-        if (esploader || transport || device) {
+        
+        if (esploader || transport || device || chip) {
             statusMessage.textContent = 'Port is open...';
             
             chip = await esploader.detectChip();
