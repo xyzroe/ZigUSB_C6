@@ -143,7 +143,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         connectButton.disabled = true;
         let chip = "?";
         
-        if (transport && device) {
+        if (esploader || transport || device) {
             statusMessage.textContent = 'Port is open...';
             
             chip = await esploader.detectChip();
