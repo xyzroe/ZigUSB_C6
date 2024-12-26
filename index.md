@@ -149,7 +149,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         const flashOptions = {
             transport: transport,
             baudrate: parseInt(460800),
-            enableTracing: true,
+            enableTracing: false,
             debugLogging: true,
         };
 
@@ -167,20 +167,27 @@ document.getElementById('connectButton').addEventListener('click', async () => {
     }
 });
 
-
 async function closeDevicePort(device) {
     if (!device) return;
 
     try {
-
-        if (device.readable && device.readable.locked) {
-            console.log("Releasing readable stream...");
-            await device.readable.cancel();
+        if (device.readable) {
+            console.log("Checking readable stream...");
+            if (device.readable.locked) {
+                console.log("Releasing readable stream...");
+                const reader = device.readable.getReader();
+                await reader.cancel(); 
+                reader.releaseLock(); 
+            }
         }
 
-        if (device.writable && device.writable.locked) {
-            console.log("Releasing writable stream...");
-            await device.writable.getWriter().releaseLock();
+        if (device.writable) {
+            console.log("Checking writable stream...");
+            if (device.writable.locked) {
+                console.log("Releasing writable stream...");
+                const writer = device.writable.getWriter();
+                writer.releaseLock(); 
+            }
         }
 
         console.log("Closing the device port...");
@@ -188,7 +195,6 @@ async function closeDevicePort(device) {
         console.log("Device port closed successfully.");
     } catch (error) {
         console.error("Error closing device port:", error);
- 
     }
 }
     
@@ -216,7 +222,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
         const flashOptions = {
             fileArray: [{ data: firmwareString, address: 0x0000 }],
             flashSize: "keep",
-            eraseAll: false,
+            eraseAll: true,
             compress: true,
             reportProgress: (fileIndex, written, total) => {
                 progressBar.value = (written / total) * 100;
