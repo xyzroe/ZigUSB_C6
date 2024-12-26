@@ -209,11 +209,15 @@ document.getElementById('flashButton').addEventListener('click', async () => {
         
         await esploader.writeFlash(flashOptions);
         statusMessage.textContent = 'Firmware flashed successfully!';
+        document.getElementById('connectButton').disabled = false;
+        document.getElementById('flashButton').disabled = true;
         alert('Firmware flashed successfully!');
 
     } catch (error) {
         console.error('Error flashing firmware:', error);
         statusMessage.textContent = 'Failed to flash firmware.';
+        document.getElementById('connectButton').disabled = false;
+        document.getElementById('flashButton').disabled = true;
         alert('Failed to flash firmware.');
     } finally {
         progressBar.style.display = 'none';
