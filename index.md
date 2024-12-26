@@ -171,23 +171,17 @@ async function closeDevicePort(device) {
     if (!device) return;
 
     try {
-        if (device.readable) {
-            console.log("Checking readable stream...");
-            if (device.readable.locked) {
-                console.log("Releasing readable stream...");
-                const reader = device.readable.getReader();
-                await reader.cancel(); 
-                reader.releaseLock(); 
-            }
+        if (device.readable && device.readable.locked) {
+            console.log("Releasing readable stream...");
+            const reader = device.readable.getReader();
+            await reader.cancel(); 
+            reader.releaseLock();
         }
 
-        if (device.writable) {
-            console.log("Checking writable stream...");
-            if (device.writable.locked) {
-                console.log("Releasing writable stream...");
-                const writer = device.writable.getWriter();
-                writer.releaseLock(); 
-            }
+        if (device.writable && device.writable.locked) {
+            console.log("Releasing writable stream...");
+            const writer = device.writable.getWriter(); 
+            writer.releaseLock(); 
         }
 
         console.log("Closing the device port...");
@@ -209,7 +203,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
         }
 
         progressBar.style.display = 'block';
-        statusMessage.textContent = 'Flashing...';
+        statusMessage.textContent = 'Erasing flash (this may take a while)...';
 
         const response = await fetch(firmwareUrl);
         const firmwareArrayBuffer = await response.arrayBuffer();
@@ -226,6 +220,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
             compress: true,
             reportProgress: (fileIndex, written, total) => {
                 progressBar.value = (written / total) * 100;
+                statusMessage.textContent = 'Flashing...';
             },
         };
 
