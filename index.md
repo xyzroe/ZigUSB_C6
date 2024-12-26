@@ -130,49 +130,35 @@ async function loadFirmwareVersions() {
         console.error('Error fetching releases:', error);
     }
 }
-
-let esploader = null;
-let transport = null;
-let device = null;
-let chip = null;
     
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const connectButton = document.getElementById('connectButton');
     
+    connectButton.disabled = true;
+
     try {
-        connectButton.disabled = true;
-        
-        console.log({ esploader, transport, device, chip });
-        
-        if (esploader || transport || device || chip) {
-            console.log("if");
-            statusMessage.textContent = 'Port is open...';
-            chip = await esploader.detectChip();
-        }
-        else {
-            console.log("else");
-            statusMessage.textContent = 'Select port';
-            device = await navigator.serial.requestPort({});
-            transport = new Transport(device);
-            const flashOptions = {
-                transport: transport,
-                baudrate: parseInt(460800),
-                enableTracing: false,
-                debugLogging: false,
-            };
-            
-            statusMessage.textContent = 'Connecting...';
-            esploader = new ESPLoader(flashOptions);
-            chip = await esploader.main();
-        }
-        
+        statusMessage.textContent = 'Select port';
+        const device = await navigator.serial.requestPort({});
+        const transport = new Transport(device);
+
+        const flashOptions = {
+            transport: transport,
+            baudrate: parseInt(460800),
+            enableTracing: false,
+            debugLogging: false,
+        };
+
+        statusMessage.textContent = 'Connecting...';
+        const esploader = new ESPLoader(flashOptions);
+        const chip = await esploader.main();
+
         document.getElementById('flashButton').disabled = false;
         statusMessage.textContent = 'Connected to: ' + chip;
-
     } catch (error) {
         console.error('Error connecting to device:', error);
         statusMessage.textContent = 'Failed to connect to device.';
+    } finally {
         connectButton.disabled = false;
     }
 });
@@ -219,12 +205,9 @@ document.getElementById('flashButton').addEventListener('click', async () => {
     } finally {
         progressBar.style.display = 'none';
 
-        document.getElementById('connectButton').disabled = false;
-        document.getElementById('flashButton').disabled = true;
+        location.reload();
     }
 });
-
-
 
 function showSerialHelp() {
     document.getElementById('coms').innerHTML = `Hit "Connect" and select the correct COM port.<br><br>
