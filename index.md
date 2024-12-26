@@ -130,6 +130,8 @@ async function loadFirmwareVersions() {
         console.error('Error fetching releases:', error);
     }
 }
+
+let esploader = null;
     
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
@@ -139,8 +141,8 @@ document.getElementById('connectButton').addEventListener('click', async () => {
 
     try {
         statusMessage.textContent = 'Select port';
-        const device = await navigator.serial.requestPort({});
-        const transport = new Transport(device);
+        let device = await navigator.serial.requestPort({});
+        let transport = new Transport(device);
 
         const flashOptions = {
             transport: transport,
@@ -150,8 +152,8 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         };
 
         statusMessage.textContent = 'Connecting...';
-        const esploader = new ESPLoader(flashOptions);
-        const chip = await esploader.main();
+        esploader = new ESPLoader(flashOptions);
+        let chip = await esploader.main();
 
         document.getElementById('flashButton').disabled = false;
         statusMessage.textContent = 'Connected to: ' + chip;
