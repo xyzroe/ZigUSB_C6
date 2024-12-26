@@ -146,7 +146,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
 
         const flashOptions = {
             transport: transport,
-            baudrate: parseInt(115200),
+            baudrate: parseInt(921600),
             enableTracing: true,
             debugLogging: true,
         };
