@@ -141,22 +141,18 @@ document.getElementById('connectButton').addEventListener('click', async () => {
     try {
         connectButton.disabled = true;
 
-        // Если транспорт уже создан и подключен
         if (transport && device) {
             statusMessage.textContent = 'Already connected. Reusing transport.';
             document.getElementById('flashButton').disabled = false;
-            return;
         }
-
-        statusMessage.textContent = 'Select port';
-
-        // Если устройства ещё нет, открываем новое подключение
-        device = await navigator.serial.requestPort({});
-        await device.open({ baudRate: 460800 });
-
-        transport = new Transport(device);
+        else {
+            statusMessage.textContent = 'Select port';
+            device = await navigator.serial.requestPort({});
+            transport = new Transport(device);
+        }
+        
         statusMessage.textContent = 'Connecting...';
-
+        
         const flashOptions = {
             transport: transport,
             baudrate: parseInt(460800),
@@ -166,8 +162,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
 
         esploader = new ESPLoader(flashOptions);
 
-        // Определяем тип микроконтроллера
-        const chip = await esploader.main();
+        let chip = await esploader.main();
 
         document.getElementById('flashButton').disabled = false;
         statusMessage.textContent = 'Connected to: ' + chip;
