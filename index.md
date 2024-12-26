@@ -146,7 +146,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         if (transport && device) {
             statusMessage.textContent = 'Port is open...';
             
-            let chip = await esploader.detectChip();
+            chip = await esploader.detectChip();
         }
         else {
             statusMessage.textContent = 'Select port';
@@ -164,7 +164,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
             statusMessage.textContent = 'Connecting...';
             
             esploader = new ESPLoader(flashOptions);
-            let chip = await esploader.main();
+            chip = await esploader.main();
         }
         
         document.getElementById('flashButton').disabled = false;
