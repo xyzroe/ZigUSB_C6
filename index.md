@@ -143,6 +143,7 @@ document.getElementById('connectButton').addEventListener('click', async () => {
     try {
         connectButton.disabled = true;
         
+        console.log({ esploader, transport, device, chip });
         
         if (esploader || transport || device || chip) {
             statusMessage.textContent = 'Port is open...';
