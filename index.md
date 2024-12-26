@@ -167,6 +167,31 @@ document.getElementById('connectButton').addEventListener('click', async () => {
     }
 });
 
+
+async function closeDevicePort(device) {
+    if (!device) return;
+
+    try {
+
+        if (device.readable && device.readable.locked) {
+            console.log("Releasing readable stream...");
+            await device.readable.cancel();
+        }
+
+        if (device.writable && device.writable.locked) {
+            console.log("Releasing writable stream...");
+            await device.writable.getWriter().releaseLock();
+        }
+
+        console.log("Closing the device port...");
+        await device.close();
+        console.log("Device port closed successfully.");
+    } catch (error) {
+        console.error("Error closing device port:", error);
+ 
+    }
+}
+    
 document.getElementById('flashButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const firmwareUrl = document.getElementById('firmwareVersion').value;
@@ -208,14 +233,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
     } finally {
         progressBar.style.display = 'none';
 
-        if (device) {
-            try {
-                await device.close();
-                console.log('Device port closed successfully.');
-            } catch (closeError) {
-                console.error('Error closing device port:', closeError);
-            }
-        }
+        await closeDevicePort(device);
 
         esploader = null;
         transport = null;
