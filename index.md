@@ -132,6 +132,8 @@ async function loadFirmwareVersions() {
 }
 
 let esploader = null;
+let transport = null;
+let device = null;
 
 document.getElementById('connectButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
@@ -140,8 +142,8 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         connectButton.disabled = true;
         statusMessage.textContent = 'Select port';
 
-        let device = await navigator.serial.requestPort({});
-        let transport = new Transport(device);
+        device = await navigator.serial.requestPort({});
+        transport = new Transport(device);
         statusMessage.textContent = 'Connecting...';
 
         const flashOptions = {
@@ -156,33 +158,29 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         let chip = await esploader.main();
 
         document.getElementById('flashButton').disabled = false;
-        //alert('Connected to device and detected chip: ' + chip);
         statusMessage.textContent = 'Connected to: '  + chip;
-    
+
     } catch (error) {
         console.error('Error connecting to device:', error);
-        //alert('Failed to connect to device.');
         statusMessage.textContent = 'Failed to connect to device.';
-                connectButton.disabled = false;
+        connectButton.disabled = false;
     }
 });
 
 document.getElementById('flashButton').addEventListener('click', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const firmwareUrl = document.getElementById('firmwareVersion').value;
-    console.log(firmwareUrl);
+    const progressBar = document.getElementById('progressBar');
+
     try {
         if (!esploader) {
             throw new Error('ESPLoader is not initialized.');
         }
 
-        const progressBar = document.getElementById('progressBar');
         progressBar.style.display = 'block';
         statusMessage.textContent = 'Flashing...';
 
-
         const response = await fetch(firmwareUrl);
-        console.log(response.headers.get('Content-Type')); 
         const firmwareArrayBuffer = await response.arrayBuffer();
         const uint8Array = new Uint8Array(firmwareArrayBuffer);
         let firmwareString = '';
@@ -198,31 +196,36 @@ document.getElementById('flashButton').addEventListener('click', async () => {
             reportProgress: (fileIndex, written, total) => {
                 progressBar.value = (written / total) * 100;
             },
-            calculateMD5Hash: (image) => {
-                const hash = CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)).toString();
-                console.log('Calculated MD5 Hash:', hash); // Log the calculated MD5 hash
-                return hash;
-            }
         };
-        
-        console.log('Flash options:', flashOptions); // Log flash options to verify their content
-        
+
         await esploader.writeFlash(flashOptions);
         statusMessage.textContent = 'Firmware flashed successfully!';
-        document.getElementById('connectButton').disabled = false;
-        document.getElementById('flashButton').disabled = true;
         alert('Firmware flashed successfully!');
-
     } catch (error) {
         console.error('Error flashing firmware:', error);
         statusMessage.textContent = 'Failed to flash firmware.';
-        document.getElementById('connectButton').disabled = false;
-        document.getElementById('flashButton').disabled = true;
         alert('Failed to flash firmware.');
     } finally {
         progressBar.style.display = 'none';
+
+        if (device) {
+            try {
+                await device.close();
+                console.log('Device port closed successfully.');
+            } catch (closeError) {
+                console.error('Error closing device port:', closeError);
+            }
+        }
+
+        esploader = null;
+        transport = null;
+        device = null;
+
+        document.getElementById('connectButton').disabled = false;
+        document.getElementById('flashButton').disabled = true;
     }
 });
+
 
 function showSerialHelp() {
     document.getElementById('coms').innerHTML = `Hit "Connect" and select the correct COM port.<br><br>
