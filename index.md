@@ -151,7 +151,9 @@ document.getElementById('connectButton').addEventListener('click', async () => {
         };
 
         statusMessage.textContent = 'Connecting...';
+        
         esploader = new ESPLoader(flashOptions);
+
         let chip = await esploader.main();
 
         document.getElementById('flashButton').disabled = false;
@@ -188,7 +190,7 @@ document.getElementById('flashButton').addEventListener('click', async () => {
         const flashOptions = {
             fileArray: [{ data: firmwareString, address: 0x0000 }],
             flashSize: "keep",
-            eraseAll: false,
+            eraseAll: true,
             compress: true,
             reportProgress: (fileIndex, written, total) => {
                 progressBar.value = (written / total) * 100;
