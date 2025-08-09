@@ -318,8 +318,11 @@ ota:
 - Other systems must be tested. The device uses standard clusters and attributes, so most coordinators can support it out of the box.
 
 ### Where to buy?
-
-<a href="https://www.tindie.com/stores/mind/?ref=offsite_badges&utm_source=sellers_xyzroe&utm_medium=badges&utm_campaign=badge_large"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie" height="120"></a>
+<div align="center">
+  <a href="https://lectronz.com/products/zigusb-c6-zigbee-usb-device-power-control" target="_blank"><img width="230" src="https://lectronz-images.b-cdn.net/static/badges/i-sell-on-lectronz-large.png" alt="I sell on Lectronz"/></a> 
+  <br>
+  <a href="https://www.tindie.com/products/mind/zigusb-c6-zigbee-usb-device-power-control/" target="_blank"><img width="230" src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie"/></a> 
+</div>
 
 ### Like ♥️?
 
