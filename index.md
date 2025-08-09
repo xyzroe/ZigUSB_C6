@@ -319,9 +319,9 @@ ota:
 
 ### Where to buy?
 <div align="center">
-  <a href="https://lectronz.com/products/zigusb-c6-zigbee-usb-device-power-control" target="_blank"><img width="230" src="https://lectronz-images.b-cdn.net/static/badges/i-sell-on-lectronz-large.png" alt="I sell on Lectronz"/></a> 
+  <a href="https://lectronz.com/products/zigusb-c6-zigbee-usb-device-power-control" target="_blank"><img height="120" src="https://lectronz-images.b-cdn.net/static/badges/i-sell-on-lectronz-large.png" alt="I sell on Lectronz"/></a> 
   <br>
-  <a href="https://www.tindie.com/products/mind/zigusb-c6-zigbee-usb-device-power-control/" target="_blank"><img width="230" src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie"/></a> 
+  <a href="https://www.tindie.com/products/mind/zigusb-c6-zigbee-usb-device-power-control/" target="_blank"><img height="120" src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-larges.png" alt="I sell on Tindie"/></a> 
 </div>
 
 ### Like ♥️?
