@@ -39,39 +39,39 @@ Stay tuned for updates as we continue to expand the capabilities of ZigUSB C6, a
 ### Overview
 
 <div align="center">
-<img width="40%" src="./images/top.png">
-<img width="40%" src="./images/bottom.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/top.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/bottom.png">
 </div>
 
 ### Photos
 
 <div align="center">
-<img width="40%" src="./images/top_case.jpeg">
-<img width="40%" src="./images/back_case.jpeg">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/top_case.jpeg">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/back_case.jpeg">
 </div>
 
 ### Schematic
 
-<div align="center"><img width="90%" src="./hardware/Schematic.png"></div>
+<div align="center"><img width="90%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/hardware/Schematic.png"></div>
   
 #### zigbee2mqtt overview
 
 <div align="center">
-<img width="40%" src="./images/dash.png">
-<img width="55%" src="./images/exposes.png">
+<img width="40%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/dash.png">
+<img width="55%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/exposes.png">
 </div>
 
 #### Home Assistant overview
 
 <div align="center">
-<img width="60%" src="./images/ha.png">
+<img width="60%" src="https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/images/ha.png">
 </div>
 
 ### Hardware files
 
-- [iBOM page](./hardware/iBOM.html) 🌍
-- [BOM file](./hardware/BOM.csv) 📃
-- [Gerber zip](./hardware/Gerber.zip) 🗂
+- [iBOM page](https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/hardware/iBOM.html) 🌍
+- [BOM file](https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/hardware/BOM.csv) 📃
+- [Gerber zip](https://raw.githubusercontent.com/xyzroe/ZigUSB_C6/master/hardware/Gerber.zip) 🗂
 
 This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>
 
